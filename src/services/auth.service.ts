@@ -6,8 +6,11 @@ const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret_key';
 
 export class AuthService {
 
-  static async register(data: Record<string, any>) {
-    const { name, email, password, role } = data;
+  static async register(data: Record<string, unknown>) {
+    const name = data.name as string;
+    const email = data.email as string;
+    const password = data.password as string;
+    const role = data.role as string;
 
     const existingUser = await User.findOne({ email });
     if (existingUser) {
@@ -32,8 +35,9 @@ export class AuthService {
     };
   }
 
-  static async login(data: Record<string, any>) {
-    const { email, password } = data;
+  static async login(data: Record<string, unknown>) {
+    const email = data.email as string;
+    const password = data.password as string;
 
     const user = await User.findOne({ email }).select('+password');
     if (!user) {

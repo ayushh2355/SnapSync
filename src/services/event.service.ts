@@ -2,15 +2,15 @@ import Event from '@/models/Event';
 
 export class EventService {
 
-  static async createEvent(data: any) {
+  static async createEvent(data: Record<string, unknown>) {
     const event = await Event.create(data);
     return event;
   }
 
-  static async getEvents(query: any = {}) {
-    const { name, category, date, sort } = query;
+  static async getEvents(query: Record<string, unknown> = {}) {
+    const { name, category, date, sort } = query as Record<string, unknown>;
     
-    const filter: any = {};
+    const filter: Record<string, unknown> = {};
 
     if (name) {
       filter.name = { $regex: name, $options: 'i' };
@@ -19,14 +19,14 @@ export class EventService {
       filter.category = category;
     }
     if (date) {
-      filter.date = { $gte: new Date(date) };
+      filter.date = { $gte: new Date(date as string) };
     }
 
     let queryBuilder = Event.find(filter);
 
     if (sort) {
 
-      const sortBy = sort.split(',').join(' ');
+      const sortBy = (sort as string).split(',').join(' ');
       queryBuilder = queryBuilder.sort(sortBy);
     } else {
       queryBuilder = queryBuilder.sort('-createdAt');
@@ -44,7 +44,7 @@ export class EventService {
     return event;
   }
 
-  static async updateEvent(id: string, data: any) {
+  static async updateEvent(id: string, data: Record<string, unknown>) {
     const event = await Event.findByIdAndUpdate(id, data, {
       new: true,
       runValidators: true,

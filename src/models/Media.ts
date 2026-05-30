@@ -7,18 +7,28 @@ const MediaSchema = new mongoose.Schema(
       ref: 'Event',
       required: true,
     },
-    url: {
-      type: String,
-      required: [true, 'Please provide a media URL'],
-    },
-    metadata: {
-      type: mongoose.Schema.Types.Mixed, 
-      default: {},
-    },
     uploadedBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
       required: true,
+    },
+    fileUrl: {
+      type: String,
+      required: true,
+    },
+    fileType: {
+      type: String,
+      enum: ['image', 'video'],
+      required: true,
+    },
+    accessType: {
+      type: String,
+      enum: ['public', 'private'],
+      default: 'public',
+    },
+    tags: {
+      type: [String],
+      default: [],
     },
   },
   { timestamps: true }

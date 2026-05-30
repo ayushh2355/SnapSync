@@ -1,36 +1,45 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# SnapSync
+
+A scalable Event & Media Management Platform (SnapSync) built with Next.js (App Router), TypeScript, and MongoDB.
+
+## Features (Phase 1)
+- **Scalable Architecture:** Organized by App Router routes, models, and custom middleware utilities.
+- **Authentication:** JWT-based user registration and login.
+- **Role-Based Access Control (RBAC):** Custom roles (`Admin`, `Photographer`, `Club Member`, `Viewer`) to restrict API access.
+- **Database Schema:** Mongoose models for `User`, `Event`, and a flexible `Media` model.
+- **Event CRUD:** Complete RESTful API for Event management with sorting and filtering.
 
 ## Getting Started
 
-First, run the development server:
+### Prerequisites
+- Node.js (v18+)
+- MongoDB connection string
 
+### Installation
+1. Clone the repository and install dependencies:
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+2. Create a `.env.local` file in the root of the project with the following variables:
+```
+MONGODB_URI=your_mongodb_connection_string
+JWT_SECRET=your_jwt_secret_key
+```
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+3. Run the development server:
+```bash
+npm run dev
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### API Endpoints
 
-## Learn More
+#### Authentication
+- `POST /api/auth/register` - Register a new user (requires `name`, `email`, `password`, `role`).
+- `POST /api/auth/login` - Login and get JWT token (requires `email`, `password`).
 
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+#### Events (Requires Bearer Token)
+- `POST /api/events` - Create a new event (Admin, Photographer only).
+- `GET /api/events` - List events (All authenticated users). Supports query params `name`, `category`, `date`, `sort`.
+- `PUT /api/events/[id]` - Update an event (Admin, Photographer only).
+- `DELETE /api/events/[id]` - Delete an event (Admin only).

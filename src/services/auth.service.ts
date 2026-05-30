@@ -5,7 +5,7 @@ import jwt from 'jsonwebtoken';
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret_key';
 
 export class AuthService {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
   static async register(data: Record<string, any>) {
     const { name, email, password, role } = data;
 
@@ -32,7 +32,6 @@ export class AuthService {
     };
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   static async login(data: Record<string, any>) {
     const { email, password } = data;
 

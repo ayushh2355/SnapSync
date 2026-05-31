@@ -17,7 +17,6 @@ export async function GET(req: NextRequest) {
     const skip = Math.max(parseInt(searchParams.get('skip') || '0'), 0);
 
     const result = await NotificationService.getNotifications(user.id, limit, skip);
-
     return NextResponse.json({ success: true, data: result }, { status: 200 });
   } catch (error: unknown) {
     return NextResponse.json(

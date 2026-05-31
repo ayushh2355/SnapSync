@@ -21,13 +21,10 @@ export async function GET(req: NextRequest) {
           controller.enqueue(encoder.encode(data));
         });
 
-        const closeHandler = () => {
+        req.signal.addEventListener('abort', () => {
           unsubscribe();
           controller.close();
-        };
-
-        const abortHandler = () => closeHandler();
-        req.signal.addEventListener('abort', abortHandler);
+        });
       },
     });
 

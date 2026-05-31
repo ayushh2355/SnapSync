@@ -13,7 +13,6 @@ export async function PATCH(req: NextRequest) {
     }
 
     await NotificationService.markAllAsRead(user.id);
-
     return NextResponse.json({ success: true }, { status: 200 });
   } catch (error: unknown) {
     return NextResponse.json(

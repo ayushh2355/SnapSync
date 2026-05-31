@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { SocialController } from '@/controllers/social.controller';
+import { CommentController } from '@/controllers/comment.controller';
+import { NextRequest } from 'next/server';
 
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ commentId: string }> }) {
   const { commentId } = await params;
-  return SocialController.deleteComment(req, commentId);
+  return CommentController.deleteComment(req, commentId);
 }

@@ -14,7 +14,7 @@ const CommentSchema = new mongoose.Schema(
     },
     text: {
       type: String,
-      required: [true, 'Comment text is required'],
+      required: true,
       minlength: 1,
       maxlength: 500,
     },

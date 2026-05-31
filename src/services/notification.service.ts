@@ -1,8 +1,6 @@
 import Notification from '@/models/Notification';
-import Media from '@/models/Media';
-import User from '@/models/User';
 
-interface RealTimeNotificationEvent {
+interface RealTimeEvent {
   type: 'like' | 'comment';
   recipientId: string;
   actorId: string;
@@ -10,7 +8,9 @@ interface RealTimeNotificationEvent {
   commentId?: string;
 }
 
-const notificationSubscribers: Map<string, Set<(event: RealTimeNotificationEvent) => void>> = new Map();
+type EventCallback = (event: RealTimeEvent) => void;
+
+const subscribers: Map<string, Set<EventCallback>> = new Map();
 
 export class NotificationService {
   static async createNotification(data: {
@@ -25,8 +25,7 @@ export class NotificationService {
     }
 
     const notification = await Notification.create(data);
-
-    this.emitRealTimeNotification({
+    this.emitToSubscribers({
       type: data.type,
       recipientId: data.recipientId,
       actorId: data.actorId,
@@ -64,7 +63,6 @@ export class NotificationService {
 
     notification.isRead = true;
     await notification.save();
-
     return notification;
   }
 
@@ -73,28 +71,24 @@ export class NotificationService {
     return { success: true };
   }
 
-  static subscribe(userId: string, callback: (event: RealTimeNotificationEvent) => void) {
-    if (!notificationSubscribers.has(userId)) {
-      notificationSubscribers.set(userId, new Set());
+  static subscribe(userId: string, callback: EventCallback) {
+    if (!subscribers.has(userId)) {
+      subscribers.set(userId, new Set());
     }
-    notificationSubscribers.get(userId)!.add(callback);
+    subscribers.get(userId)!.add(callback);
 
     return () => {
-      notificationSubscribers.get(userId)?.delete(callback);
-      if (notificationSubscribers.get(userId)?.size === 0) {
-        notificationSubscribers.delete(userId);
+      subscribers.get(userId)?.delete(callback);
+      if (subscribers.get(userId)?.size === 0) {
+        subscribers.delete(userId);
       }
     };
   }
 
-  private static emitRealTimeNotification(event: RealTimeNotificationEvent) {
-    const callbacks = notificationSubscribers.get(event.recipientId);
+  private static emitToSubscribers(event: RealTimeEvent) {
+    const callbacks = subscribers.get(event.recipientId);
     if (callbacks) {
-      callbacks.forEach(callback => callback(event));
+      callbacks.forEach(cb => cb(event));
     }
-  }
-
-  static getActiveSubscribers(userId: string): number {
-    return notificationSubscribers.get(userId)?.size || 0;
   }
 }

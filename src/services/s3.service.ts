@@ -1,4 +1,4 @@
-import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
 import crypto from 'crypto';
 
 const s3Client = new S3Client({
@@ -30,14 +30,11 @@ export class S3Service {
 
     await s3Client.send(command);
 
-    // Assuming the bucket allows public read or we return the format
     const url = `https://${BUCKET_NAME}.s3.${process.env.AWS_REGION || 'us-east-1'}.amazonaws.com/${key}`;
     return { url, key };
   }
 
-  /**
-   * Deletes a file from AWS S3. Used for rollback.
-   */
+
   static async deleteFile(key: string) {
     const command = new DeleteObjectCommand({
       Bucket: BUCKET_NAME,
@@ -45,5 +42,21 @@ export class S3Service {
     });
 
     await s3Client.send(command);
+  }
+
+  static async getFileBuffer(key: string): Promise<Buffer> {
+    const command = new GetObjectCommand({
+      Bucket: BUCKET_NAME,
+      Key: key,
+    });
+
+    const response = await s3Client.send(command);
+    
+    if (!response.Body) {
+      throw new Error('S3 file body is empty');
+    }
+
+    const bytes = await response.Body.transformToByteArray();
+    return Buffer.from(bytes);
   }
 }

@@ -3,6 +3,8 @@ import { authenticate } from '@/middlewares/auth';
 import connectToDatabase from '@/lib/db';
 import { S3Service } from '@/services/s3.service';
 import { MediaService } from '@/services/media.service';
+import { VisionService } from '@/services/vision.service';
+import { FaceService } from '@/services/face.service';
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'video/mp4', 'video/webm'];
@@ -36,26 +38,38 @@ export class MediaController {
         return NextResponse.json({ success: false, error: 'Invalid file type.' }, { status: 400 });
       }
 
-      const tags = rawTags ? JSON.parse(rawTags) : [];
+      const initialTags = rawTags ? JSON.parse(rawTags) : [];
       const buffer = Buffer.from(await file.arrayBuffer());
+      
+      const fileType = file.type.startsWith('image') ? 'image' : 'video';
+      
+      let finalTags = [...initialTags];
+      let detectedUsers: string[] = [];
 
-      // Upload to S3
+      if (fileType === 'image') {
+        const aiTags = await VisionService.generateTags(buffer);
+        finalTags = Array.from(new Set([...finalTags, ...aiTags]));
+        
+        const faceMetadata = await FaceService.detectFaces(buffer);
+        detectedUsers = await FaceService.findMatchingUsers(faceMetadata);
+      }
+
       const { url, key } = await S3Service.uploadFile(buffer, file.type, file.name);
 
       try {
-        const fileType = file.type.startsWith('image') ? 'image' : 'video';
         const mediaRecord = await MediaService.createMediaRecord({
           eventId,
           uploadedBy: user.id,
           fileUrl: url,
           fileType,
           accessType,
-          tags,
+          tags: finalTags,
+          detectedUsers,
         });
 
         return NextResponse.json({ success: true, data: mediaRecord }, { status: 201 });
       } catch (dbError: unknown) {
-        // Rollback S3 upload if DB save fails
+       
         await S3Service.deleteFile(key).catch(console.error);
         throw dbError;
       }

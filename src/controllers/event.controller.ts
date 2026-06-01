@@ -12,7 +12,7 @@ export class EventController {
         return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
       }
 
-      // Extract query params for filtering/sorting
+
       const { searchParams } = new URL(req.url);
       const query = Object.fromEntries(searchParams.entries());
 

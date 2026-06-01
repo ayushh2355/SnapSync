@@ -1,12 +1,10 @@
 import mongoose from 'mongoose';
 
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let cached = (global as any).mongoose;
+let cached = (global as unknown as { mongoose: { conn: unknown; promise: Promise<unknown> | null } }).mongoose;
 
 if (!cached) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  cached = (global as any).mongoose = { conn: null, promise: null };
+
+  cached = (global as unknown as { mongoose: { conn: unknown; promise: Promise<unknown> | null } }).mongoose = { conn: null, promise: null };
 }
 
 async function connectToDatabase() {

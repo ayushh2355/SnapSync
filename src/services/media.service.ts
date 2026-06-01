@@ -8,6 +8,7 @@ export class MediaService {
     fileType: 'image' | 'video';
     accessType?: 'public' | 'private';
     tags?: string[];
+    detectedUsers?: string[];
   }) {
     const media = await Media.create(data);
     return media;

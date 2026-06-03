@@ -38,4 +38,31 @@ export class AuthController {
       );
     }
   }
+
+  static async googleLogin(req: NextRequest) {
+    try {
+      await connectToDatabase();
+      const body = await req.json();
+      const idToken = body.idToken;
+
+      if (!idToken || typeof idToken !== 'string') {
+        return NextResponse.json(
+          { success: false, error: 'Google idToken is required' },
+          { status: 400 }
+        );
+      }
+
+      const result = await AuthService.googleLogin(idToken);
+      
+      return NextResponse.json(
+        { success: true, data: result },
+        { status: 200 }
+      );
+    } catch (error: unknown) {
+      return NextResponse.json(
+        { success: false, error: (error as Error).message },
+        { status: 400 }
+      );
+    }
+  }
 }

@@ -1,8 +1,12 @@
 import User from '@/models/User';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import { OAuth2Client } from 'google-auth-library';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret_key';
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || 'your-google-client-id';
+
+const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
 
 export class AuthService {
 
@@ -47,6 +51,50 @@ export class AuthService {
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
       throw new Error('Invalid credentials');
+    }
+
+    const token = jwt.sign(
+      { id: user._id, role: user.role },
+      JWT_SECRET,
+      { expiresIn: '1d' }
+    );
+
+    return {
+      token,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+      },
+    };
+  }
+
+  static async googleLogin(idToken: string) {
+    const ticket = await googleClient.verifyIdToken({
+      idToken,
+      audience: GOOGLE_CLIENT_ID,
+    });
+
+    const payload = ticket.getPayload();
+    if (!payload || !payload.email || !payload.name) {
+      throw new Error('Invalid Google token');
+    }
+
+    const { email, name, sub: googleId } = payload;
+
+    let user = await User.findOne({ email });
+
+    if (!user) {
+      user = await User.create({
+        name,
+        email,
+        googleId,
+        role: 'Viewer',
+      });
+    } else if (!user.googleId) {
+      user.googleId = googleId;
+      await user.save();
     }
 
     const token = jwt.sign(

@@ -34,6 +34,11 @@ const MediaSchema = new mongoose.Schema(
       type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
       default: [],
     },
+    hash: {
+      type: String,
+      required: true,
+      index: true,
+    },
   },
   { timestamps: true }
 );

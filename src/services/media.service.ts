@@ -9,9 +9,15 @@ export class MediaService {
     accessType?: 'public' | 'private';
     tags?: string[];
     detectedUsers?: string[];
+    hash: string;
   }) {
     const media = await Media.create(data);
     return media;
+  }
+
+  static async checkDuplicate(eventId: string, hash: string): Promise<boolean> {
+    const existing = await Media.findOne({ eventId, hash });
+    return !!existing;
   }
 
   static async getMediaForEvent(eventId: string, includePrivate: boolean) {

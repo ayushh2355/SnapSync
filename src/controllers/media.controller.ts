@@ -5,6 +5,8 @@ import { S3Service } from '@/services/s3.service';
 import { MediaService } from '@/services/media.service';
 import { VisionService } from '@/services/vision.service';
 import { FaceService } from '@/services/face.service';
+import { SharingService } from '@/services/sharing.service';
+import crypto from 'crypto';
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'video/mp4', 'video/webm'];
@@ -41,6 +43,12 @@ export class MediaController {
       const initialTags = rawTags ? JSON.parse(rawTags) : [];
       const buffer = Buffer.from(await file.arrayBuffer());
       
+      const fileHash = crypto.createHash('sha256').update(buffer).digest('hex');
+      const isDuplicate = await MediaService.checkDuplicate(eventId, fileHash);
+      if (isDuplicate) {
+        return NextResponse.json({ success: false, error: 'Duplicate media detected for this event.' }, { status: 409 });
+      }
+
       const fileType = file.type.startsWith('image') ? 'image' : 'video';
       
       let finalTags = [...initialTags];
@@ -65,6 +73,7 @@ export class MediaController {
           accessType,
           tags: finalTags,
           detectedUsers,
+          hash: fileHash,
         });
 
         return NextResponse.json({ success: true, data: mediaRecord }, { status: 201 });
@@ -82,9 +91,20 @@ export class MediaController {
     try {
       await connectToDatabase();
       const user = await authenticate(req);
-
+      
+      const { searchParams } = new URL(req.url);
+      const token = searchParams.get('shareToken');
+      
       let includePrivate = false;
-      if (user && ['Admin', 'Photographer', 'Club Member'].includes(user.role)) {
+
+      if (token) {
+        const decodedEventId = SharingService.verifyShareToken(token);
+        if (decodedEventId === eventId) {
+          includePrivate = true;
+        }
+      }
+
+      if (!includePrivate && user && ['Admin', 'Photographer', 'Club Member'].includes(user.role)) {
         includePrivate = true;
       }
 

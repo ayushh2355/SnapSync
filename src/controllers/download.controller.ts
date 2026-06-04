@@ -39,7 +39,7 @@ export class DownloadController {
       headers.set('Content-Type', media.fileType === 'image' ? 'image/jpeg' : 'video/mp4');
       headers.set('Content-Disposition', `attachment; filename="download_${mediaId}.${media.fileType === 'image' ? 'jpg' : 'mp4'}"`);
 
-      return new NextResponse(finalBuffer, { status: 200, headers });
+      return new NextResponse(finalBuffer as unknown as BodyInit, { status: 200, headers });
     } catch (error: unknown) {
       return NextResponse.json({ success: false, error: (error as Error).message }, { status: 400 });
     }

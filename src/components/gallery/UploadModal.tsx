@@ -3,6 +3,7 @@ import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { UploadCloud } from 'lucide-react';
 import { apiClient } from '@/lib/apiClient';
+import { useToast } from '@/hooks/use-toast';
 
 interface UploadModalProps {
   isOpen: boolean;
@@ -15,8 +16,8 @@ export const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, event
   const [file, setFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
-  const [error, setError] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { toast } = useToast();
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -46,7 +47,6 @@ export const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, event
     if (!file) return;
     
     setIsUploading(true);
-    setError('');
 
     const formData = new FormData();
     formData.append('file', file);
@@ -59,12 +59,21 @@ export const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, event
         body: formData,
       });
       
+      toast({
+        title: 'Success',
+        description: 'File uploaded successfully!',
+      });
+
       onUploadSuccess();
       setFile(null);
       onClose();
     } catch (err: unknown) {
       const msg = (err as Error).message;
-      setError(msg.includes('Duplicate media') ? 'This image is a duplicate and has already been uploaded to this event.' : msg);
+      toast({
+        title: 'Upload Failed',
+        description: msg.includes('Duplicate media') ? 'This image is a duplicate and has already been uploaded to this event.' : msg,
+        variant: 'destructive',
+      });
     } finally {
       setIsUploading(false);
     }
@@ -73,8 +82,6 @@ export const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, event
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Upload Media">
       <div className="space-y-4">
-        {error && <div className="p-3 bg-red-500/10 border border-red-500/50 rounded-md text-red-500 text-sm text-center">{error}</div>}
-        
         {!file ? (
           <div 
             className={`border-2 border-dashed rounded-xl p-10 flex flex-col items-center justify-center text-center cursor-pointer transition-colors ${isDragging ? 'border-blue-500 bg-blue-500/10' : 'border-gray-700 hover:border-gray-500'}`}

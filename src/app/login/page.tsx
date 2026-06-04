@@ -5,17 +5,17 @@ import { useRouter } from 'next/navigation';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { apiClient } from '@/lib/apiClient';
+import { useToast } from '@/hooks/use-toast';
 
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const { toast } = useToast();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
     setIsLoading(true);
 
     try {
@@ -25,9 +25,10 @@ export default function LoginPage() {
       });
 
       document.cookie = `token=${response.data.token}; path=/; max-age=86400; SameSite=Strict`;
+      toast({ title: 'Welcome Back', description: 'You have successfully signed in.' });
       router.push('/dashboard');
     } catch (err: unknown) {
-      setError((err as Error).message);
+      toast({ title: 'Login Failed', description: (err as Error).message, variant: 'destructive' });
     } finally {
       setIsLoading(false);
     }
@@ -40,8 +41,6 @@ export default function LoginPage() {
           <h1 className="text-3xl font-bold text-white mb-2">Welcome Back</h1>
           <p className="text-gray-400">Sign in to SnapSync to continue.</p>
         </div>
-        
-        {error && <div className="mb-4 p-3 bg-red-500/10 border border-red-500/50 rounded-md text-red-500 text-sm text-center">{error}</div>}
         
         <form onSubmit={handleLogin} className="space-y-4">
           <Input 

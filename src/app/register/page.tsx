@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { apiClient } from '@/lib/apiClient';
+import { useToast } from '@/hooks/use-toast';
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -12,12 +13,11 @@ export default function RegisterPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [role, setRole] = useState('Viewer');
-  const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const { toast } = useToast();
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
     setIsLoading(true);
 
     try {
@@ -25,9 +25,10 @@ export default function RegisterPage() {
         method: 'POST',
         body: JSON.stringify({ name, email, password, role }),
       });
+      toast({ title: 'Registration Successful', description: 'You can now sign in.' });
       router.push('/login');
     } catch (err: unknown) {
-      setError((err as Error).message);
+      toast({ title: 'Registration Failed', description: (err as Error).message, variant: 'destructive' });
     } finally {
       setIsLoading(false);
     }
@@ -40,8 +41,6 @@ export default function RegisterPage() {
           <h1 className="text-3xl font-bold text-white mb-2">Create Account</h1>
           <p className="text-gray-400">Join SnapSync today.</p>
         </div>
-        
-        {error && <div className="mb-4 p-3 bg-red-500/10 border border-red-500/50 rounded-md text-red-500 text-sm text-center">{error}</div>}
         
         <form onSubmit={handleRegister} className="space-y-4">
           <Input 

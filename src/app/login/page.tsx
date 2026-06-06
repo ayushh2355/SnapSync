@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { apiClient } from '@/lib/apiClient';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/providers/AuthProvider';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -13,6 +14,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
+  const { login } = useAuth();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -24,7 +26,7 @@ export default function LoginPage() {
         body: JSON.stringify({ email, password }),
       });
 
-      document.cookie = `token=${response.data.token}; path=/; max-age=86400; SameSite=Strict`;
+      login(response.data.token, response.data.user);
       toast({ title: 'Welcome Back', description: 'You have successfully signed in.' });
       router.push('/dashboard');
     } catch (err: unknown) {

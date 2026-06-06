@@ -3,7 +3,10 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card } from '@/components/ui/Card';
+import { Button } from '@/components/ui/Button';
 import { apiClient } from '@/lib/apiClient';
+import { useAuth } from '@/providers/AuthProvider';
+import { Plus, LogOut, Home } from 'lucide-react';
 
 interface Event {
   _id: string;
@@ -18,8 +21,14 @@ export default function DashboardPage() {
   const [events, setEvents] = useState<Event[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  const { isAuthenticated, logout, isLoading: authLoading } = useAuth();
 
   useEffect(() => {
+    if (!isAuthenticated && !authLoading) {
+      router.push('/login');
+      return;
+    }
+
     const fetchEvents = async () => {
       try {
         const response = await apiClient('/api/events');
@@ -31,10 +40,12 @@ export default function DashboardPage() {
       }
     };
 
-    fetchEvents();
-  }, []);
+    if (isAuthenticated) {
+      fetchEvents();
+    }
+  }, [isAuthenticated, authLoading, router]);
 
-  if (isLoading) {
+  if (isLoading || authLoading) {
     return <div className="min-h-screen flex items-center justify-center text-white">Loading dashboard...</div>;
   }
 
@@ -44,6 +55,20 @@ export default function DashboardPage() {
         <div>
           <h1 className="text-3xl font-bold text-white mb-2">Your Dashboard</h1>
           <p className="text-gray-400">Manage and view your events.</p>
+        </div>
+        <div className="flex items-center gap-4">
+          <Button onClick={() => router.push('/')} variant="secondary" className="flex items-center gap-2 bg-transparent border border-gray-700 hover:bg-gray-800">
+            <Home size={18} />
+            Home
+          </Button>
+          <Button onClick={() => router.push('/events/new')} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700">
+            <Plus size={18} />
+            Add Event
+          </Button>
+          <Button onClick={logout} variant="secondary" className="flex items-center gap-2">
+            <LogOut size={18} />
+            Sign Out
+          </Button>
         </div>
       </div>
 

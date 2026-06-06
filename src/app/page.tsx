@@ -1,11 +1,8 @@
-import type { Metadata } from 'next';
+'use client';
+
 import Link from 'next/link';
 import { Shield, Tags, CalendarDays } from 'lucide-react';
 
-export const metadata: Metadata = {
-  title: 'SnapSync | Event Media Management',
-  description: 'Organize, tag, and deliver event photos with role-based access and AI categorization.',
-};
 const FEATURES = [
   {
     name: 'Role-Based Access',
@@ -27,7 +24,12 @@ const FEATURES = [
   },
 ];
 
+import { useAuth } from '@/providers/AuthProvider';
+import { ProfileDropdown } from '@/components/ui/ProfileDropdown';
+
 export default function Home() {
+  const { isAuthenticated, isLoading } = useAuth();
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-50 font-sans selection:bg-indigo-500/30">
       
@@ -38,12 +40,12 @@ export default function Home() {
 
       <div className="relative z-10 flex flex-col min-h-screen">
         <header className="flex items-center justify-between px-8 py-6 border-b border-white/10 bg-slate-950/50 backdrop-blur-md">
-          <div className="flex items-center gap-2">
+          <Link href="/" className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-fuchsia-500 flex items-center justify-center font-bold text-lg">
               S
             </div>
             <span className="font-semibold text-xl tracking-tight">SnapSync</span>
-          </div>
+          </Link>
           
           <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-300">
             <Link href="#features" className="hover:text-white transition-colors">Features</Link>
@@ -51,12 +53,20 @@ export default function Home() {
           </nav>
           
           <div className="flex items-center gap-4">
-            <Link href="/login" className="text-sm font-medium text-slate-300 hover:text-white transition-colors">
-              Log in
-            </Link>
-            <Link href="/register" className="text-sm font-medium bg-white text-slate-950 px-4 py-2 rounded-full hover:bg-slate-200 transition-colors">
-              Get Started
-            </Link>
+            {isLoading ? (
+              <div className="w-10 h-10 rounded-full bg-slate-800 animate-pulse border-2 border-indigo-500/50"></div>
+            ) : isAuthenticated ? (
+              <ProfileDropdown />
+            ) : (
+              <>
+                <Link href="/login" className="text-sm font-medium text-slate-300 hover:text-white transition-colors">
+                  Log in
+                </Link>
+                <Link href="/register" className="text-sm font-medium bg-white text-slate-950 px-4 py-2 rounded-full hover:bg-slate-200 transition-colors">
+                  Get Started
+                </Link>
+              </>
+            )}
           </div>
         </header>
 

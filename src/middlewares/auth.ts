@@ -32,7 +32,8 @@ export async function authenticate(req: NextRequest): Promise<AuthUser | null> {
       id: user._id.toString(),
       role: user.role,
     };
-  } catch {
+  } catch (error) {
+    console.error('JWT Verification Failed:', error);
     return null;
   }
 }

@@ -6,6 +6,7 @@ import { ImageGrid } from '@/components/gallery/ImageGrid';
 import { UploadModal } from '@/components/gallery/UploadModal';
 import { apiClient } from '@/lib/apiClient';
 import { Plus } from 'lucide-react';
+import { useAuth } from '@/providers/AuthProvider';
 
 interface Media {
   _id: string;
@@ -23,8 +24,15 @@ export default function EventGalleryPage({ params }: { params: Promise<{ id: str
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
 
   useEffect(() => {
+    if (!isAuthenticated && !authLoading) {
+      router.push('/login');
+      return;
+    }
+
+    if (!isAuthenticated) return;
     let isMounted = true;
     const fetchMedia = async () => {
       try {
@@ -39,7 +47,7 @@ export default function EventGalleryPage({ params }: { params: Promise<{ id: str
 
     fetchMedia();
     return () => { isMounted = false; };
-  }, [eventId]);
+  }, [eventId, isAuthenticated, authLoading, router]);
 
   const handleUploadSuccess = async () => {
     try {
@@ -50,7 +58,7 @@ export default function EventGalleryPage({ params }: { params: Promise<{ id: str
     }
   };
 
-  if (isLoading) {
+  if (isLoading || authLoading) {
     return <div className="min-h-screen flex items-center justify-center text-white">Loading gallery...</div>;
   }
 

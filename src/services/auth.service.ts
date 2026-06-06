@@ -54,7 +54,7 @@ export class AuthService {
     }
 
     const token = jwt.sign(
-      { id: user._id, role: user.role },
+      { id: user._id.toString(), role: user.role },
       JWT_SECRET,
       { expiresIn: '1d' }
     );
@@ -62,7 +62,7 @@ export class AuthService {
     return {
       token,
       user: {
-        id: user._id,
+        id: user._id.toString(),
         name: user.name,
         email: user.email,
         role: user.role,
@@ -98,7 +98,7 @@ export class AuthService {
     }
 
     const token = jwt.sign(
-      { id: user._id, role: user.role },
+      { id: user._id.toString(), role: user.role },
       JWT_SECRET,
       { expiresIn: '1d' }
     );
@@ -106,7 +106,7 @@ export class AuthService {
     return {
       token,
       user: {
-        id: user._id,
+        id: user._id.toString(),
         name: user.name,
         email: user.email,
         role: user.role,

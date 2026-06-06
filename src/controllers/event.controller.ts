@@ -28,10 +28,18 @@ export class EventController {
       await connectToDatabase();
       const user = await authenticate(req);
       if (!authorize(user, ['Admin', 'Photographer'])) {
-        return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
+        return NextResponse.json({ 
+          success: false, 
+          error: `Forbidden (Role: ${user ? user.role : 'null'})` 
+        }, { status: 403 });
       }
 
       const body = await req.json();
+      
+      if (user) {
+        body.createdBy = user.id;
+      }
+
       const event = await EventService.createEvent(body);
       
       return NextResponse.json({ success: true, data: event }, { status: 201 });

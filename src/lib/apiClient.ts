@@ -1,7 +1,14 @@
 export function getAuthToken(): string | null {
   if (typeof document === 'undefined') return null;
-  const match = document.cookie.match(/(^|;\\s*)token=([^;]+)/);
-  return match ? match[2] : null;
+  const cookies = document.cookie.split(';');
+  let token = null;
+  for (const cookie of cookies) {
+    const [name, value] = cookie.trim().split('=');
+    if (name === 'token') {
+      token = value;
+    }
+  }
+  return token;
 }
 
 export async function apiClient(endpoint: string, options: RequestInit = {}) {

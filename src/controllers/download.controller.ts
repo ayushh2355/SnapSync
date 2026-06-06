@@ -21,12 +21,20 @@ export class DownloadController {
       }
 
       const fileUrl = media.fileUrl as string;
-      const urlParts = fileUrl.split('.amazonaws.com/');
-      if (urlParts.length !== 2) {
-        throw new Error('Invalid S3 URL format');
+      let key = '';
+
+      if (fileUrl.includes('.amazonaws.com/')) {
+        const urlParts = fileUrl.split('.amazonaws.com/');
+        if (urlParts.length !== 2) throw new Error('Invalid S3 URL format');
+        key = urlParts[1];
+      } else if (fileUrl.startsWith('/uploads/media/')) {
+        key = fileUrl.replace('/uploads/', '');
+      } else if (fileUrl.startsWith('/api/media/serve/')) {
+        key = fileUrl.replace('/api/media/serve/', 'media/');
+      } else {
+        throw new Error('Unknown media URL format');
       }
 
-      const key = urlParts[1];
       const buffer = await S3Service.getFileBuffer(key);
 
       let finalBuffer = buffer;

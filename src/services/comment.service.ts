@@ -7,33 +7,34 @@ export class CommentService {
     return comment;
   }
 
-  static async getCommentsForMedia(mediaId: string, limit: number = 20, skip: number = 0) {
-    const comments = await Comment.find({ mediaId })
-      .populate('userId', 'name email')
-      .sort('-createdAt')
-      .limit(limit)
-      .skip(skip);
+  static async getCommentsForMedia(mediaId: string, limit = 20, skip = 0) {
+    const [comments, total] = await Promise.all([
+      Comment.find({ mediaId })
+        .populate('userId', 'name email')
+        .sort({ createdAt: -1 })
+        .limit(limit)
+        .skip(skip)
+        .lean(),
+      Comment.countDocuments({ mediaId }),
+    ]);
 
-    const total = await Comment.countDocuments({ mediaId });
     return { comments, total };
   }
 
   static async deleteComment(commentId: string, userId: string) {
-    const comment = await Comment.findById(commentId);
+    const comment = await Comment.findOneAndDelete({
+      _id: commentId,
+      userId,
+    }).lean();
 
     if (!comment) {
-      throw new Error('Comment not found');
+      throw new Error('Comment not found or unauthorized');
     }
 
-    if (comment.userId.toString() !== userId) {
-      throw new Error('Unauthorized to delete this comment');
-    }
-
-    await Comment.deleteOne({ _id: commentId });
     return { success: true };
   }
 
-  static async getCommentCount(mediaId: string) {
-    return await Comment.countDocuments({ mediaId });
+  static async getCommentCount(mediaId: string): Promise<number> {
+    return Comment.countDocuments({ mediaId });
   }
 }

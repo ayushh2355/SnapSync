@@ -3,43 +3,57 @@ import jwt from 'jsonwebtoken';
 import User from '@/models/User';
 import connectToDatabase from '@/lib/db';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret_key';
+if (!process.env.JWT_SECRET) {
+  throw new Error('JWT_SECRET is not defined in environment variables');
+}
+
+const JWT_SECRET = process.env.JWT_SECRET;
 
 export interface AuthUser {
   id: string;
   role: string;
 }
 
-export async function authenticate(req: NextRequest): Promise<AuthUser | null> {
-  await connectToDatabase();
+function extractToken(req: NextRequest): string | null {
   const authHeader = req.headers.get('authorization');
-  
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+  if (authHeader?.startsWith('Bearer ')) {
+    return authHeader.slice(7);
+  }
+  return req.cookies.get('token')?.value ?? null;
+}
+
+export async function authenticate(req: NextRequest): Promise<AuthUser | null> {
+  const token = extractToken(req);
+
+  if (!token) {
     return null;
   }
 
-  const token = authHeader.split(' ')[1];
+  let decoded: { id: string };
 
   try {
-    const decoded = jwt.verify(token, JWT_SECRET) as { id: string };
-    const user = await User.findById(decoded.id);
-    
+    decoded = jwt.verify(token, JWT_SECRET) as { id: string };
+  } catch {
+    return null;
+  }
+
+  try {
+    await connectToDatabase();
+    const user = await User.findById(decoded.id).lean();
+
     if (!user) {
       return null;
     }
 
     return {
-      id: user._id.toString(),
-      role: user.role,
+      id: (user._id as { toString(): string }).toString(),
+      role: (user as { role: string }).role,
     };
-  } catch (error) {
-    console.error('JWT Verification Failed:', error);
+  } catch {
     return null;
   }
 }
 
 export function authorize(user: AuthUser | null, roles: string[]): boolean {
-  if (!user) return false;
-  if (!roles.includes(user.role)) return false;
-  return true;
+  return !!user && roles.includes(user.role);
 }

@@ -1,4 +1,5 @@
 import Notification from '@/models/Notification';
+import '@/models/Media';
 
 interface RealTimeEvent {
   type: 'like' | 'comment';
@@ -25,6 +26,7 @@ export class NotificationService {
     }
 
     const notification = await Notification.create(data);
+
     this.emitToSubscribers({
       type: data.type,
       recipientId: data.recipientId,
@@ -36,38 +38,38 @@ export class NotificationService {
     return notification;
   }
 
-  static async getNotifications(userId: string, limit: number = 20, skip: number = 0) {
-    const notifications = await Notification.find({ recipientId: userId })
-      .populate('actorId', 'name email')
-      .populate('mediaId')
-      .sort('-createdAt')
-      .limit(limit)
-      .skip(skip);
-
-    const total = await Notification.countDocuments({ recipientId: userId });
-    const unreadCount = await Notification.countDocuments({ recipientId: userId, isRead: false });
+  static async getNotifications(userId: string, limit = 20, skip = 0) {
+    const [notifications, total, unreadCount] = await Promise.all([
+      Notification.find({ recipientId: userId })
+        .populate('actorId', 'name email')
+        .populate('mediaId')
+        .sort({ createdAt: -1 })
+        .limit(limit)
+        .skip(skip)
+        .lean(),
+      Notification.countDocuments({ recipientId: userId }),
+      Notification.countDocuments({ recipientId: userId, isRead: false }),
+    ]);
 
     return { notifications, total, unreadCount };
   }
 
   static async markAsRead(notificationId: string, userId: string) {
-    const notification = await Notification.findById(notificationId);
+    const notification = await Notification.findOneAndUpdate(
+      { _id: notificationId, recipientId: userId },
+      { isRead: true },
+      { new: true }
+    ).lean();
 
     if (!notification) {
-      throw new Error('Notification not found');
+      throw new Error('Notification not found or unauthorized');
     }
 
-    if (notification.recipientId.toString() !== userId) {
-      throw new Error('Unauthorized');
-    }
-
-    notification.isRead = true;
-    await notification.save();
     return notification;
   }
 
   static async markAllAsRead(userId: string) {
-    await Notification.updateMany({ recipientId: userId }, { isRead: true });
+    await Notification.updateMany({ recipientId: userId, isRead: false }, { isRead: true });
     return { success: true };
   }
 
@@ -78,17 +80,16 @@ export class NotificationService {
     subscribers.get(userId)!.add(callback);
 
     return () => {
-      subscribers.get(userId)?.delete(callback);
-      if (subscribers.get(userId)?.size === 0) {
+      const userSubs = subscribers.get(userId);
+      if (!userSubs) return;
+      userSubs.delete(callback);
+      if (userSubs.size === 0) {
         subscribers.delete(userId);
       }
     };
   }
 
   private static emitToSubscribers(event: RealTimeEvent) {
-    const callbacks = subscribers.get(event.recipientId);
-    if (callbacks) {
-      callbacks.forEach(cb => cb(event));
-    }
+    subscribers.get(event.recipientId)?.forEach((cb) => cb(event));
   }
 }

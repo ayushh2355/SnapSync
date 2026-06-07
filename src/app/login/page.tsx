@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/Button';
 import { apiClient } from '@/lib/apiClient';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/providers/AuthProvider';
+import { GoogleLogin, CredentialResponse } from '@react-oauth/google';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -14,7 +15,13 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
-  const { login } = useAuth();
+  const { login, isAuthenticated } = useAuth();
+
+  React.useEffect(() => {
+    if (isAuthenticated) {
+      router.push('/dashboard');
+    }
+  }, [isAuthenticated, router]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,6 +41,27 @@ export default function LoginPage() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleGoogleSuccess = async (credentialResponse: CredentialResponse) => {
+    try {
+      setIsLoading(true);
+      const response = await apiClient('/api/auth/google', {
+        method: 'POST',
+        body: JSON.stringify({ idToken: credentialResponse.credential }),
+      });
+      login(response.data.token, response.data.user);
+      toast({ title: 'Welcome', description: 'You have successfully signed in with Google.' });
+      router.push('/dashboard');
+    } catch (err: unknown) {
+      toast({ title: 'Google Login Failed', description: (err as Error).message, variant: 'destructive' });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleGoogleError = () => {
+    toast({ title: 'Google Login Failed', description: 'Could not connect to Google', variant: 'destructive' });
   };
 
   return (
@@ -65,6 +93,21 @@ export default function LoginPage() {
             Sign In
           </Button>
         </form>
+
+        <div className="mt-6 flex items-center gap-4">
+          <div className="h-px bg-gray-800 flex-1"></div>
+          <span className="text-gray-500 text-sm">or</span>
+          <div className="h-px bg-gray-800 flex-1"></div>
+        </div>
+
+        <div className="mt-6 flex justify-center">
+          <GoogleLogin
+            onSuccess={handleGoogleSuccess}
+            onError={handleGoogleError}
+            theme="filled_black"
+            shape="pill"
+          />
+        </div>
 
         <div className="mt-6 text-center text-sm text-gray-400">
           Don&apos;t have an account? <a href="/register" className="text-blue-500 hover:underline">Register here</a>

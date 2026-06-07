@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { X, ChevronLeft, ChevronRight, Heart, MessageCircle, Share2, Download, Loader2 } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, Heart, MessageCircle, Share2, Download, Loader2, Star, UserPlus, Search } from 'lucide-react';
 import { apiClient } from '@/lib/apiClient';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/providers/AuthProvider';
@@ -10,6 +10,7 @@ interface Media {
   _id: string;
   fileUrl: string;
   tags: string[];
+  detectedUsers?: { _id: string; name: string }[];
 }
 
 interface Comment {
@@ -41,13 +42,42 @@ export const Lightbox: React.FC<LightboxProps> = ({
   
   const [likeCount, setLikeCount] = useState(0);
   const [isLiked, setIsLiked] = useState(false);
+  const [isFavourited, setIsFavourited] = useState(false);
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState('');
   const [isPostingComment, setIsPostingComment] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [isLoadingStats, setIsLoadingStats] = useState(false);
+  const [isTagging, setIsTagging] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<{_id: string, name: string}[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [localTaggedUsers, setLocalTaggedUsers] = useState<{_id: string, name: string}[]>([]);
 
   const currentMedia = mediaList[selectedIndex];
+
+  useEffect(() => {
+    setLocalTaggedUsers(currentMedia?.detectedUsers || []);
+  }, [currentMedia]);
+
+  useEffect(() => {
+    if (searchQuery.length < 2) {
+      setSearchResults([]);
+      return;
+    }
+    const timeout = setTimeout(async () => {
+      setIsSearching(true);
+      try {
+        const res = await apiClient(`/api/user/search?q=${searchQuery}`);
+        setSearchResults(res.data);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 300);
+    return () => clearTimeout(timeout);
+  }, [searchQuery]);
 
   useEffect(() => {
     if (!isOpen || !currentMedia) return;
@@ -62,6 +92,7 @@ export const Lightbox: React.FC<LightboxProps> = ({
         
         setLikeCount(statsRes.data.likeCount || 0);
         setIsLiked(statsRes.data.isLikedByUser || false);
+        setIsFavourited(statsRes.data.isFavourited || false);
         setComments(commentsRes.data?.comments || []);
       } catch (error) {
         console.error('Failed to load media interactions', error);
@@ -82,7 +113,6 @@ export const Lightbox: React.FC<LightboxProps> = ({
     }
 
     try {
-      // Optimistic update
       setIsLiked(!isLiked);
       setLikeCount(prev => isLiked ? prev - 1 : prev + 1);
 
@@ -91,10 +121,25 @@ export const Lightbox: React.FC<LightboxProps> = ({
       setLikeCount(res.data.likeCount);
       setIsLiked(res.data.liked);
     } catch (_) {
-      // Revert optimistic update on failure
       setIsLiked(!isLiked);
       setLikeCount(prev => isLiked ? prev - 1 : prev + 1);
       toast({ title: 'Error', description: 'Failed to update like status', variant: 'destructive' });
+    }
+  };
+
+  const handleFavourite = async () => {
+    if (!isAuthenticated) {
+      toast({ title: 'Sign in required', description: 'Please sign in to favourite photos.' });
+      return;
+    }
+
+    try {
+      setIsFavourited(!isFavourited);
+      const res = await apiClient(`/api/social/favourite/${currentMedia._id}`, { method: 'POST' });
+      setIsFavourited(res.data.isFavourited);
+    } catch (_) {
+      setIsFavourited(!isFavourited);
+      toast({ title: 'Error', description: 'Failed to update favourite status', variant: 'destructive' });
     }
   };
 
@@ -119,6 +164,22 @@ export const Lightbox: React.FC<LightboxProps> = ({
       toast({ title: 'Error', description: (err as Error).message || 'Failed to post comment', variant: 'destructive' });
     } finally {
       setIsPostingComment(false);
+    }
+  };
+
+  const handleTagUser = async (user: {_id: string, name: string}) => {
+    if (localTaggedUsers.find(u => u._id === user._id)) return;
+    try {
+      const res = await apiClient(`/api/media/${currentMedia._id}/tags`, {
+        method: 'POST',
+        body: JSON.stringify({ userId: user._id })
+      });
+      setLocalTaggedUsers(res.data);
+      setSearchQuery('');
+      setIsTagging(false);
+      toast({ title: 'User Tagged', description: `${user.name} has been tagged.` });
+    } catch (err: unknown) {
+      toast({ title: 'Error', description: (err as Error).message, variant: 'destructive' });
     }
   };
 
@@ -157,7 +218,6 @@ export const Lightbox: React.FC<LightboxProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex bg-black/95 backdrop-blur-sm">
-      {/* Close Button */}
       <button 
         onClick={onClose}
         className="absolute top-4 right-4 md:right-auto md:left-4 z-50 p-2 bg-black/50 hover:bg-black/80 rounded-full text-white transition-colors"
@@ -165,7 +225,6 @@ export const Lightbox: React.FC<LightboxProps> = ({
         <X size={24} />
       </button>
 
-      {/* Main Image Area */}
       <div className="flex-1 relative flex items-center justify-center">
         <button 
           onClick={onPrev}
@@ -193,10 +252,8 @@ export const Lightbox: React.FC<LightboxProps> = ({
         </button>
       </div>
 
-      {/* Sidebar for Social Interactions */}
       <div className="w-full md:w-[400px] h-full bg-gray-900 border-l border-gray-800 flex flex-col flex-shrink-0">
         
-        {/* Actions Bar */}
         <div className="p-4 border-b border-gray-800 flex justify-between items-center bg-gray-900/50">
           <div className="flex items-center gap-4 text-white">
             <button onClick={handleLike} className="flex items-center gap-2 hover:text-red-400 transition-colors">
@@ -210,6 +267,9 @@ export const Lightbox: React.FC<LightboxProps> = ({
           </div>
 
           <div className="flex gap-3 text-white">
+            <button onClick={handleFavourite} className="p-2 hover:bg-gray-800 rounded-full transition-colors" title="Add to Favourites">
+              <Star size={20} className={isFavourited ? "fill-yellow-500 text-yellow-500" : ""} />
+            </button>
             <button onClick={handleShare} className="p-2 hover:bg-gray-800 rounded-full transition-colors" title="Copy Link">
               <Share2 size={20} />
             </button>
@@ -219,7 +279,6 @@ export const Lightbox: React.FC<LightboxProps> = ({
           </div>
         </div>
 
-        {/* Tags */}
         {currentMedia.tags.length > 0 && (
           <div className="p-4 border-b border-gray-800">
             <div className="flex flex-wrap gap-2">
@@ -232,7 +291,69 @@ export const Lightbox: React.FC<LightboxProps> = ({
           </div>
         )}
 
-        {/* Comments Section */}
+        <div className="p-4 border-b border-gray-800">
+          <div className="flex justify-between items-center mb-2">
+            <h4 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">People in this photo</h4>
+            {isAuthenticated && (
+              <button 
+                onClick={() => setIsTagging(!isTagging)}
+                className="text-blue-400 hover:text-blue-300 text-sm flex items-center gap-1"
+              >
+                <UserPlus size={14} /> {isTagging ? 'Cancel' : 'Tag'}
+              </button>
+            )}
+          </div>
+
+          <div className="flex flex-wrap gap-2 mb-2">
+            {localTaggedUsers.length === 0 ? (
+              <span className="text-sm text-gray-500">No one tagged yet.</span>
+            ) : (
+              localTaggedUsers.map(user => (
+                <span key={user._id} className="text-sm bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 px-3 py-1 rounded-full flex items-center gap-1">
+                  @ {user.name}
+                </span>
+              ))
+            )}
+          </div>
+
+          {isTagging && (
+            <div className="mt-3 relative">
+              <div className="flex items-center bg-gray-800 border border-gray-700 rounded-lg px-3 py-2">
+                <Search size={16} className="text-gray-400 mr-2" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search to tag..."
+                  className="bg-transparent border-none text-sm text-white focus:outline-none w-full"
+                  autoFocus
+                />
+              </div>
+              {searchQuery.length >= 2 && (
+                <div className="absolute top-full left-0 right-0 mt-1 bg-[#0f172a] border border-gray-800 rounded-lg shadow-xl overflow-hidden z-50">
+                  {isSearching ? (
+                    <div className="p-3 text-sm text-gray-400 flex items-center gap-2">
+                      <Loader2 size={14} className="animate-spin" /> Searching...
+                    </div>
+                  ) : searchResults.length === 0 ? (
+                    <div className="p-3 text-sm text-gray-500">No users found.</div>
+                  ) : (
+                    searchResults.map(user => (
+                      <button
+                        key={user._id}
+                        onClick={() => handleTagUser(user)}
+                        className="w-full text-left p-3 hover:bg-gray-800 text-sm text-gray-300 transition-colors border-b border-gray-800/50 last:border-0"
+                      >
+                        {user.name}
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
         <div className="flex-1 overflow-y-auto p-4 space-y-6">
           {isLoadingStats ? (
             <div className="flex justify-center py-8"><Loader2 className="animate-spin text-gray-500" /></div>
@@ -253,7 +374,6 @@ export const Lightbox: React.FC<LightboxProps> = ({
           )}
         </div>
 
-        {/* Comment Input */}
         <div className="p-4 border-t border-gray-800 bg-gray-900">
           <form onSubmit={handlePostComment} className="flex gap-2">
             <input

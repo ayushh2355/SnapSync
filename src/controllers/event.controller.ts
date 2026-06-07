@@ -3,23 +3,30 @@ import { EventService } from '@/services/event.service';
 import { authenticate, authorize } from '@/middlewares/auth';
 import connectToDatabase from '@/lib/db';
 
+const ALLOWED_QUERY_KEYS = new Set(['page', 'limit', 'search', 'date', 'sortBy', 'category']);
+
 export class EventController {
   static async getEvents(req: NextRequest) {
     try {
       await connectToDatabase();
       const user = await authenticate(req);
+
       if (!user) {
         return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
       }
 
-
       const { searchParams } = new URL(req.url);
-      const query = Object.fromEntries(searchParams.entries());
+      const query: Record<string, string> = {};
+      for (const [key, value] of searchParams.entries()) {
+        if (ALLOWED_QUERY_KEYS.has(key)) {
+          query[key] = value;
+        }
+      }
 
       const events = await EventService.getEvents(query);
       return NextResponse.json({ success: true, data: events }, { status: 200 });
     } catch (error: unknown) {
-      return NextResponse.json({ success: false, error: (error as Error).message }, { status: 400 });
+      return NextResponse.json({ success: false, error: (error as Error).message }, { status: 500 });
     }
   }
 
@@ -27,24 +34,32 @@ export class EventController {
     try {
       await connectToDatabase();
       const user = await authenticate(req);
+
       if (!authorize(user, ['Admin', 'Photographer'])) {
-        return NextResponse.json({ 
-          success: false, 
-          error: `Forbidden (Role: ${user ? user.role : 'null'})` 
-        }, { status: 403 });
+        return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
       }
 
       const body = await req.json();
-      
-      if (user) {
-        body.createdBy = user.id;
+      const { name, date, description, category } = body;
+
+      if (!name || !date || !category) {
+        return NextResponse.json(
+          { success: false, error: 'name, date, and category are required' },
+          { status: 400 }
+        );
       }
 
-      const event = await EventService.createEvent(body);
-      
+      const event = await EventService.createEvent({
+        name,
+        date,
+        description,
+        category,
+        createdBy: user!.id,
+      });
+
       return NextResponse.json({ success: true, data: event }, { status: 201 });
     } catch (error: unknown) {
-      return NextResponse.json({ success: false, error: (error as Error).message }, { status: 400 });
+      return NextResponse.json({ success: false, error: (error as Error).message }, { status: 500 });
     }
   }
 
@@ -52,14 +67,19 @@ export class EventController {
     try {
       await connectToDatabase();
       const user = await authenticate(req);
+
       if (!user) {
         return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
       }
 
       const event = await EventService.getEventById(id);
+      if (!event) {
+        return NextResponse.json({ success: false, error: 'Event not found' }, { status: 404 });
+      }
+
       return NextResponse.json({ success: true, data: event }, { status: 200 });
     } catch (error: unknown) {
-      return NextResponse.json({ success: false, error: (error as Error).message }, { status: 404 });
+      return NextResponse.json({ success: false, error: (error as Error).message }, { status: 500 });
     }
   }
 
@@ -67,16 +87,22 @@ export class EventController {
     try {
       await connectToDatabase();
       const user = await authenticate(req);
+
       if (!authorize(user, ['Admin', 'Photographer'])) {
         return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
       }
 
       const body = await req.json();
-      const event = await EventService.updateEvent(id, body);
-      
+      const { name, date, description, category } = body;
+
+      const event = await EventService.updateEvent(id, { name, date, description, category });
+      if (!event) {
+        return NextResponse.json({ success: false, error: 'Event not found' }, { status: 404 });
+      }
+
       return NextResponse.json({ success: true, data: event }, { status: 200 });
     } catch (error: unknown) {
-      return NextResponse.json({ success: false, error: (error as Error).message }, { status: 400 });
+      return NextResponse.json({ success: false, error: (error as Error).message }, { status: 500 });
     }
   }
 
@@ -84,15 +110,15 @@ export class EventController {
     try {
       await connectToDatabase();
       const user = await authenticate(req);
+
       if (!authorize(user, ['Admin'])) {
         return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
       }
 
       await EventService.deleteEvent(id);
-      
-      return NextResponse.json({ success: true, data: {} }, { status: 200 });
+      return NextResponse.json({ success: true }, { status: 200 });
     } catch (error: unknown) {
-      return NextResponse.json({ success: false, error: (error as Error).message }, { status: 400 });
+      return NextResponse.json({ success: false, error: (error as Error).message }, { status: 500 });
     }
   }
 }

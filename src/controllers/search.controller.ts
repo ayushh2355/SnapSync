@@ -2,7 +2,15 @@ import { NextRequest, NextResponse } from 'next/server';
 import { authenticate } from '@/middlewares/auth';
 import connectToDatabase from '@/lib/db';
 import Media from '@/models/Media';
+import Like from '@/models/Like';
 import mongoose from 'mongoose';
+
+const PRIVILEGED_ROLES = new Set(['Admin', 'Photographer', 'Club Member']);
+
+function safeInt(value: string | null, fallback: number): number {
+  const parsed = parseInt(value ?? '', 10);
+  return isNaN(parsed) ? fallback : parsed;
+}
 
 export class SearchController {
   static async searchMedia(req: NextRequest) {
@@ -10,17 +18,14 @@ export class SearchController {
       await connectToDatabase();
       const user = await authenticate(req);
 
-      let includePrivate = false;
-      if (user && ['Admin', 'Photographer', 'Club Member'].includes(user.role)) {
-        includePrivate = true;
-      }
+      const includePrivate = !!user && PRIVILEGED_ROLES.has(user.role);
 
       const { searchParams } = new URL(req.url);
       const tags = searchParams.getAll('tag');
       const eventId = searchParams.get('eventId');
       const uploadedBy = searchParams.get('uploadedBy');
-      const limit = Math.min(parseInt(searchParams.get('limit') || '20'), 100);
-      const skip = Math.max(parseInt(searchParams.get('skip') || '0'), 0);
+      const limit = Math.min(safeInt(searchParams.get('limit'), 20), 100);
+      const skip = Math.max(safeInt(searchParams.get('skip'), 0), 0);
 
       const query: Record<string, unknown> = {};
 
@@ -28,7 +33,7 @@ export class SearchController {
         query.accessType = 'public';
       }
 
-      if (tags && tags.length > 0) {
+      if (tags.length > 0) {
         query.tags = { $in: tags };
       }
 
@@ -40,18 +45,36 @@ export class SearchController {
         query.uploadedBy = new mongoose.Types.ObjectId(uploadedBy);
       }
 
-      const media = await Media.find(query)
-        .sort('-createdAt')
-        .limit(limit)
-        .skip(skip)
-        .populate('eventId', 'name')
-        .populate('uploadedBy', 'name');
+      const [media, total] = await Promise.all([
+        Media.find(query)
+          .sort({ createdAt: -1 })
+          .limit(limit)
+          .skip(skip)
+          .populate('eventId', 'name')
+          .populate('uploadedBy', 'name')
+          .populate('detectedUsers', 'name')
+          .lean(),
+        Media.countDocuments(query),
+      ]);
 
-      const total = await Media.countDocuments(query);
+      const mediaIds = media.map((m) => m._id);
+      const likeCounts = await Like.aggregate([
+        { $match: { mediaId: { $in: mediaIds } } },
+        { $group: { _id: '$mediaId', count: { $sum: 1 } } },
+      ]);
+      const likeCountMap: Record<string, number> = {};
+      for (const item of likeCounts) {
+        likeCountMap[item._id.toString()] = item.count;
+      }
 
-      return NextResponse.json({ success: true, data: { media, total } }, { status: 200 });
+      const mediaWithLikes = media.map((m) => ({
+        ...m,
+        likesCount: likeCountMap[m._id.toString()] ?? 0,
+      }));
+
+      return NextResponse.json({ success: true, data: { media: mediaWithLikes, total } }, { status: 200 });
     } catch (error: unknown) {
-      return NextResponse.json({ success: false, error: (error as Error).message }, { status: 400 });
+      return NextResponse.json({ success: false, error: (error as Error).message }, { status: 500 });
     }
   }
 }

@@ -1,32 +1,43 @@
 import Media from '@/models/Media';
 
+interface CreateMediaData {
+  eventId: string;
+  uploadedBy: string;
+  fileUrl: string;
+  s3Key: string;
+  mimeType: string;
+  fileType: 'image' | 'video';
+  accessType?: 'public' | 'private';
+  tags?: string[];
+  detectedUsers?: string[];
+  hash: string;
+}
+
 export class MediaService {
-  static async createMediaRecord(data: {
-    eventId: string;
-    uploadedBy: string;
-    fileUrl: string;
-    fileType: 'image' | 'video';
-    accessType?: 'public' | 'private';
-    tags?: string[];
-    detectedUsers?: string[];
-    hash: string;
-  }) {
-    const media = await Media.create(data);
-    return media;
+  static async createMediaRecord(data: CreateMediaData) {
+    return Media.create(data);
   }
 
   static async checkDuplicate(eventId: string, hash: string): Promise<boolean> {
-    const existing = await Media.findOne({ eventId, hash });
-    return !!existing;
+    return !!(await Media.exists({ eventId, hash }));
   }
 
-  static async getMediaForEvent(eventId: string, includePrivate: boolean) {
+  static async getMediaForEvent(
+    eventId: string,
+    includePrivate: boolean,
+    limit = 50,
+    skip = 0
+  ) {
     const query: Record<string, unknown> = { eventId };
-    
+
     if (!includePrivate) {
       query.accessType = 'public';
     }
 
-    return await Media.find(query).sort('-createdAt');
+    return Media.find(query)
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .skip(skip)
+      .lean();
   }
 }

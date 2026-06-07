@@ -27,18 +27,18 @@ export const ImageGrid: React.FC<ImageGridProps> = ({ mediaList }) => {
 
   return (
     <>
-      <div className="columns-2 md:columns-3 lg:columns-4 gap-4 space-y-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 w-full">
         {mediaList.map((media, index) => (
-          <div 
-            key={media._id} 
-            className="relative group break-inside-avoid overflow-hidden rounded-xl border border-gray-800 bg-gray-900 cursor-pointer"
+          <div
+            key={media._id}
+            className="relative group overflow-hidden rounded-xl border border-gray-800 bg-gray-900 cursor-pointer aspect-square"
             onClick={() => setSelectedIndex(index)}
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img 
-              src={media.fileUrl} 
-              alt="Event media" 
-              className="w-full object-cover transition-transform duration-300 group-hover:scale-105"
+            <img
+              src={media.fileUrl}
+              alt="Event media"
+              className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
               loading="lazy"
             />
             <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-4">

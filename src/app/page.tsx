@@ -26,6 +26,7 @@ const FEATURES = [
 
 import { useAuth } from '@/providers/AuthProvider';
 import { ProfileDropdown } from '@/components/ui/ProfileDropdown';
+import { NotificationBell } from '@/components/ui/NotificationBell';
 
 export default function Home() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -56,7 +57,10 @@ export default function Home() {
             {isLoading ? (
               <div className="w-10 h-10 rounded-full bg-slate-800 animate-pulse border-2 border-indigo-500/50"></div>
             ) : isAuthenticated ? (
-              <ProfileDropdown />
+              <>
+                <NotificationBell />
+                <ProfileDropdown />
+              </>
             ) : (
               <>
                 <Link href="/login" className="text-sm font-medium text-slate-300 hover:text-white transition-colors">
@@ -80,18 +84,29 @@ export default function Home() {
           </p>
 
           <div className="flex flex-col sm:flex-row items-center gap-4">
-            <Link 
-              href="/register" 
-              className="w-full sm:w-auto px-8 py-3 rounded-full bg-indigo-600 text-white font-medium text-lg hover:bg-indigo-500 transition-colors shadow-lg shadow-indigo-500/20"
-            >
-             Get Started
-            </Link>
-            <Link 
-              href="#demo" 
-              className="w-full sm:w-auto px-8 py-3 rounded-full bg-white/5 border border-white/10 text-white font-medium text-lg hover:bg-white/10 transition-colors"
-            >
-              View Demo
-            </Link>
+            {isAuthenticated ? (
+              <Link 
+                href="/dashboard" 
+                className="w-full sm:w-auto px-8 py-3 rounded-full bg-indigo-600 text-white font-medium text-lg hover:bg-indigo-500 transition-colors shadow-lg shadow-indigo-500/20"
+              >
+                Go to Dashboard
+              </Link>
+            ) : (
+              <>
+                <Link 
+                  href="/register" 
+                  className="w-full sm:w-auto px-8 py-3 rounded-full bg-indigo-600 text-white font-medium text-lg hover:bg-indigo-500 transition-colors shadow-lg shadow-indigo-500/20"
+                >
+                 Get Started
+                </Link>
+                <Link 
+                  href="#demo" 
+                  className="w-full sm:w-auto px-8 py-3 rounded-full bg-white/5 border border-white/10 text-white font-medium text-lg hover:bg-white/10 transition-colors"
+                >
+                  View Demo
+                </Link>
+              </>
+            )}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-32 max-w-6xl w-full text-left">

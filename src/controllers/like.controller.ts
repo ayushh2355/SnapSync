@@ -4,6 +4,7 @@ import connectToDatabase from '@/lib/db';
 import { LikeService } from '@/services/like.service';
 import { NotificationService } from '@/services/notification.service';
 import Media from '@/models/Media';
+import Favourite from '@/models/Favourite';
 
 export class LikeController {
   static async toggleLike(req: NextRequest, mediaId: string) {
@@ -15,30 +16,28 @@ export class LikeController {
         return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
       }
 
-      const media = await Media.findById(mediaId);
+      const media = await Media.findById(mediaId).lean();
       if (!media) {
         return NextResponse.json({ success: false, error: 'Media not found' }, { status: 404 });
       }
 
       const { liked, likeCount } = await LikeService.toggleLike(mediaId, user.id);
 
-      if (liked) {
+      const ownerId = (media.uploadedBy as { toString(): string }).toString();
+      if (liked && ownerId !== user.id) {
         await NotificationService.createNotification({
-          recipientId: media.uploadedBy.toString(),
+          recipientId: ownerId,
           actorId: user.id,
           type: 'like',
           mediaId,
         });
       }
 
-      return NextResponse.json(
-        { success: true, data: { liked, likeCount } },
-        { status: 200 }
-      );
+      return NextResponse.json({ success: true, data: { liked, likeCount } }, { status: 200 });
     } catch (error: unknown) {
       return NextResponse.json(
         { success: false, error: (error as Error).message },
-        { status: 400 }
+        { status: 500 }
       );
     }
   }
@@ -48,26 +47,25 @@ export class LikeController {
       await connectToDatabase();
       const user = await authenticate(req);
 
-      const media = await Media.findById(mediaId);
+      const media = await Media.findById(mediaId).lean();
       if (!media) {
         return NextResponse.json({ success: false, error: 'Media not found' }, { status: 404 });
       }
 
-      const likeCount = await LikeService.getLikeCount(mediaId);
-      let isLikedByUser = false;
-
-      if (user) {
-        isLikedByUser = await LikeService.isLikedByUser(mediaId, user.id);
-      }
+      const [likeCount, isLikedByUser, favourite] = await Promise.all([
+        LikeService.getLikeCount(mediaId),
+        user ? LikeService.isLikedByUser(mediaId, user.id) : Promise.resolve(false),
+        user ? Favourite.exists({ mediaId, userId: user.id }) : Promise.resolve(null),
+      ]);
 
       return NextResponse.json(
-        { success: true, data: { likeCount, isLikedByUser } },
+        { success: true, data: { likeCount, isLikedByUser, isFavourited: !!favourite } },
         { status: 200 }
       );
     } catch (error: unknown) {
       return NextResponse.json(
         { success: false, error: (error as Error).message },
-        { status: 400 }
+        { status: 500 }
       );
     }
   }

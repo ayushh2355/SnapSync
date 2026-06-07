@@ -51,8 +51,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, event
     let successCount = 0;
     let failCount = 0;
 
-    // Upload files sequentially to avoid rate limiting / DB locks
-    for (const file of files) {
+    for (const file of Array.from(files)) {
       const formData = new FormData();
       formData.append('file', file);
       formData.append('eventId', eventId);

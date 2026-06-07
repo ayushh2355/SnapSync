@@ -1,19 +1,17 @@
 export function getAuthToken(): string | null {
   if (typeof document === 'undefined') return null;
-  const cookies = document.cookie.split(';');
-  let token = null;
-  for (const cookie of cookies) {
-    const [name, value] = cookie.trim().split('=');
-    if (name === 'token') {
-      token = value;
-    }
-  }
-  return token;
+
+  const match = document.cookie
+    .split(';')
+    .map((c) => c.trim())
+    .find((c) => c.startsWith('token='));
+
+  return match ? match.slice('token='.length) : null;
 }
 
 export async function apiClient(endpoint: string, options: RequestInit = {}) {
   const token = getAuthToken();
-  const headers = new Headers(options.headers || {});
+  const headers = new Headers(options.headers ?? {});
 
   if (token) {
     headers.set('Authorization', `Bearer ${token}`);
@@ -23,15 +21,22 @@ export async function apiClient(endpoint: string, options: RequestInit = {}) {
     headers.set('Content-Type', 'application/json');
   }
 
-  const response = await fetch(endpoint, {
-    ...options,
-    headers,
-  });
+  let response: Response;
 
-  const data = await response.json().catch(() => ({}));
+  try {
+    response = await fetch(endpoint, { ...options, headers });
+  } catch {
+    throw new Error(`Network error while calling ${endpoint}`);
+  }
+
+  const contentType = response.headers.get('Content-Type') ?? '';
+  const data = contentType.includes('application/json')
+    ? await response.json().catch(() => ({}))
+    : {};
 
   if (!response.ok) {
-    throw new Error(data.error || 'API request failed');
+    const message = (data as { error?: string }).error ?? `Request failed with status ${response.status}`;
+    throw new Error(message);
   }
 
   return data;

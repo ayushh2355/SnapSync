@@ -33,7 +33,7 @@ export const ProfileDropdown: React.FC = () => {
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-64 bg-[#0f172a] border border-gray-800 rounded-xl shadow-xl overflow-hidden z-50">
+        <div className="absolute right-0 mt-2 w-64 bg-[#0f172a] border border-gray-800 rounded-xl shadow-xl overflow-hidden z-[100]">
           <div className="p-4 border-b border-gray-800">
             <div className="flex items-center gap-2 mb-1">
               <span className="font-semibold text-white truncate max-w-[150px]">{user.name}</span>

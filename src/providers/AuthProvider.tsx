@@ -29,6 +29,14 @@ const AuthContext = createContext<AuthContextType>({
   isLoading: true,
 });
 
+function setTokenCookie(token: string, maxAge: number) {
+  document.cookie = `token=${token}; path=/; max-age=${maxAge}; SameSite=Strict`;
+}
+
+function clearTokenCookie() {
+  document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+}
+
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [token, setToken] = useState<string | null>(null);
   const [user, setUser] = useState<User | null>(null);
@@ -37,32 +45,48 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   useEffect(() => {
     const storedToken = getAuthToken();
-    if (storedToken && !user) {
-      setToken(storedToken);
-      fetch('/api/user/me', {
-        headers: { Authorization: `Bearer ${storedToken}` }
-      })
-      .then(res => {
+
+    if (!storedToken) {
+      setIsLoading(false);
+      return;
+    }
+
+    const controller = new AbortController();
+
+    setToken(storedToken);
+
+    fetch('/api/user/me', {
+      headers: { Authorization: `Bearer ${storedToken}` },
+      signal: controller.signal,
+    })
+      .then((res) => {
         if (!res.ok) {
-          document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+          clearTokenCookie();
           setToken(null);
           setUser(null);
-          return null; // Return null instead of throwing to prevent Next.js dev error overlay
+          return null;
         }
         return res.json();
       })
-      .then(data => {
-        if (data && data.success) setUser(data.data);
+      .then((data) => {
+        if (data?.success) {
+          setUser(data.data);
+        }
       })
-      .catch(console.error)
-      .finally(() => setIsLoading(false));
-    } else {
-      setIsLoading(false);
-    }
-  }, [token]);
+      .catch((err) => {
+        if (err.name !== 'AbortError') {
+          console.error(err);
+        }
+      })
+      .finally(() => {
+        setIsLoading(false);
+      });
+
+    return () => controller.abort();
+  }, []);
 
   const login = (newToken: string, userData?: User) => {
-    document.cookie = `token=${newToken}; path=/; max-age=86400; SameSite=Strict`;
+    setTokenCookie(newToken, 86400);
     setToken(newToken);
     if (userData) {
       setUser(userData);
@@ -70,22 +94,26 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const logout = () => {
-    document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+    clearTokenCookie();
     setToken(null);
     setUser(null);
     router.push('/login');
   };
 
-  const value = {
-    token,
-    user,
-    isAuthenticated: !!token,
-    login,
-    logout,
-    isLoading,
-  };
-
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider
+      value={{
+        token,
+        user,
+        isAuthenticated: !!token && !!user,
+        login,
+        logout,
+        isLoading,
+      }}
+    >
+      {children}
+    </AuthContext.Provider>
+  );
 };
 
 export const useAuth = () => useContext(AuthContext);

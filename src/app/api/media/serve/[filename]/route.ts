@@ -6,8 +6,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ file
   try {
     const { filename } = await params;
     
-    // Security: Validate filename to prevent path traversal
-    if (!filename || filename.includes('/') || filename.includes('..')) {
+    if (filename.includes('..') || filename.includes('/')) {
       return new NextResponse('Invalid filename', { status: 400 });
     }
 
@@ -19,8 +18,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ file
 
     const buffer = fs.readFileSync(filePath);
 
-    // Determine content type
-    const ext = filename.split('.').pop()?.toLowerCase();
+    const ext = path.extname(filename).toLowerCase();
     let contentType = 'application/octet-stream';
     if (ext === 'jpg' || ext === 'jpeg') contentType = 'image/jpeg';
     else if (ext === 'png') contentType = 'image/png';

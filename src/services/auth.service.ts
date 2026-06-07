@@ -3,45 +3,54 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { OAuth2Client } from 'google-auth-library';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret_key';
-const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || 'your-google-client-id';
+if (!process.env.JWT_SECRET) {
+  throw new Error('JWT_SECRET is not defined in environment variables');
+}
+if (!process.env.AUTH_GOOGLE_ID) {
+  throw new Error('AUTH_GOOGLE_ID is not defined in environment variables');
+}
+
+const JWT_SECRET = process.env.JWT_SECRET;
+const GOOGLE_CLIENT_ID = process.env.AUTH_GOOGLE_ID;
 
 const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
 
+function signToken(userId: string, role: string): string {
+  return jwt.sign({ id: userId, role }, JWT_SECRET, { expiresIn: '1d' });
+}
+
+function buildUserPayload(user: { _id: unknown; name: string; email: string; role: string }) {
+  return {
+    id: (user._id as { toString(): string }).toString(),
+    name: user.name,
+    email: user.email,
+    role: user.role,
+  };
+}
+
 export class AuthService {
+  static async register(data: { name: string; email: string; password: string }) {
+    const { name, email, password } = data;
 
-  static async register(data: Record<string, unknown>) {
-    const name = data.name as string;
-    const email = data.email as string;
-    const password = data.password as string;
-    const role = data.role as string;
-
-    const existingUser = await User.findOne({ email });
+    const existingUser = await User.findOne({ email }).lean();
     if (existingUser) {
       throw new Error('User with this email already exists');
     }
 
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
+    const hashedPassword = await bcrypt.hash(password, 10);
 
     const user = await User.create({
       name,
       email,
       password: hashedPassword,
-      role: role || 'Viewer',
+      role: 'Viewer',
     });
 
-    return {
-      id: user._id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-    };
+    return buildUserPayload(user);
   }
 
-  static async login(data: Record<string, unknown>) {
-    const email = data.email as string;
-    const password = data.password as string;
+  static async login(data: { email: string; password: string }) {
+    const { email, password } = data;
 
     const user = await User.findOne({ email }).select('+password');
     if (!user) {
@@ -53,21 +62,8 @@ export class AuthService {
       throw new Error('Invalid credentials');
     }
 
-    const token = jwt.sign(
-      { id: user._id.toString(), role: user.role },
-      JWT_SECRET,
-      { expiresIn: '1d' }
-    );
-
-    return {
-      token,
-      user: {
-        id: user._id.toString(),
-        name: user.name,
-        email: user.email,
-        role: user.role,
-      },
-    };
+    const token = signToken(user._id.toString(), user.role);
+    return { token, user: buildUserPayload(user) };
   }
 
   static async googleLogin(idToken: string) {
@@ -77,40 +73,19 @@ export class AuthService {
     });
 
     const payload = ticket.getPayload();
-    if (!payload || !payload.email || !payload.name) {
-      throw new Error('Invalid Google token');
+    if (!payload?.email || !payload?.name) {
+      throw new Error('Invalid Google token payload');
     }
 
     const { email, name, sub: googleId } = payload;
 
-    let user = await User.findOne({ email });
-
-    if (!user) {
-      user = await User.create({
-        name,
-        email,
-        googleId,
-        role: 'Viewer',
-      });
-    } else if (!user.googleId) {
-      user.googleId = googleId;
-      await user.save();
-    }
-
-    const token = jwt.sign(
-      { id: user._id.toString(), role: user.role },
-      JWT_SECRET,
-      { expiresIn: '1d' }
+    const user = await User.findOneAndUpdate(
+      { email },
+      { $setOnInsert: { name, email, googleId, role: 'Viewer' }, $set: { name, googleId } },
+      { new: true, upsert: true }
     );
 
-    return {
-      token,
-      user: {
-        id: user._id.toString(),
-        name: user.name,
-        email: user.email,
-        role: user.role,
-      },
-    };
+    const token = signToken(user._id.toString(), user.role);
+    return { token, user: buildUserPayload(user) };
   }
 }

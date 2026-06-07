@@ -16,6 +16,8 @@ const MediaSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    s3Key: { type: String, required: true },
+  mimeType: { type: String, required: true },
     fileType: {
       type: String,
       enum: ['image', 'video'],

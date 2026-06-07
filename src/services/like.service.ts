@@ -2,10 +2,9 @@ import Like from '@/models/Like';
 
 export class LikeService {
   static async toggleLike(mediaId: string, userId: string) {
-    const existingLike = await Like.findOne({ mediaId, userId });
+    const deleted = await Like.findOneAndDelete({ mediaId, userId }).lean();
 
-    if (existingLike) {
-      await Like.deleteOne({ _id: existingLike._id });
+    if (deleted) {
       const likeCount = await Like.countDocuments({ mediaId });
       return { liked: false, likeCount };
     }
@@ -15,12 +14,11 @@ export class LikeService {
     return { liked: true, likeCount };
   }
 
-  static async getLikeCount(mediaId: string) {
-    return await Like.countDocuments({ mediaId });
+  static async getLikeCount(mediaId: string): Promise<number> {
+    return Like.countDocuments({ mediaId });
   }
 
-  static async isLikedByUser(mediaId: string, userId: string) {
-    const like = await Like.findOne({ mediaId, userId });
-    return !!like;
+  static async isLikedByUser(mediaId: string, userId: string): Promise<boolean> {
+    return !!(await Like.exists({ mediaId, userId }));
   }
 }

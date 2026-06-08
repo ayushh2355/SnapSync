@@ -24,6 +24,10 @@ export default function ProfilePage() {
     eventsContributedTo: 0,
     totalLikesReceived: 0,
   });
+  const [referenceUrl, setReferenceUrl] = useState<string | null>(null);
+  const [isUploadingSelfie, setIsUploadingSelfie] = useState(false);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const { toast } = require('@/hooks/use-toast');
 
   useEffect(() => {
     if (!isAuthenticated && !authLoading) {
@@ -61,13 +65,51 @@ export default function ProfilePage() {
           }
         })
         .catch(console.error);
+
+      // Fetch user's reference photo
+      apiClient('/api/users/profile/reference')
+        .then((res) => {
+          if (res.success && res.data?.selfieUrl) {
+            setReferenceUrl(res.data.selfieUrl);
+          }
+        })
+        .catch(() => {});
     }
   }, [isAuthenticated, user]);
 
+  const handleSelfieUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploadingSelfie(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      const res = await fetch('/api/users/profile/reference', {
+        method: 'POST',
+        body: formData,
+      });
+      const data = await res.json();
+      
+      if (data.success) {
+        toast({ title: 'Success', description: 'Selfie reference uploaded securely.' });
+        setReferenceUrl(data.data.selfieUrl);
+      } else {
+        toast({ title: 'Error', description: data.error || 'Upload failed', variant: 'destructive' });
+      }
+    } catch (err: any) {
+      toast({ title: 'Error', description: err.message, variant: 'destructive' });
+    } finally {
+      setIsUploadingSelfie(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
   if (authLoading || !user) {
     return (
-      <div className="min-h-screen bg-[#0B0E14] flex items-center justify-center p-4">
-        <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+      <div className="min-h-screen flex items-center justify-center p-4 relative z-10">
+        <div className="w-10 h-10 border-4 border-fuchsia-500 border-t-transparent rounded-full animate-spin"></div>
       </div>
     );
   }
@@ -81,20 +123,20 @@ export default function ProfilePage() {
   const badgeTheme = roleColors[user.role] || roleColors['Viewer'];
 
   return (
-    <div className="min-h-screen bg-[#0f172a] text-slate-300 font-sans selection:bg-indigo-500/30 pb-20">
-      
+    <div className="min-h-screen text-slate-900 dark:text-gray-100 font-sans selection:bg-fuchsia-500/30 pb-20 relative z-10">
+
       {/* Top Header */}
-      <div className="h-24 px-8 max-w-7xl mx-auto flex items-end pb-4">
+      <div className="h-24 px-8 max-w-7xl mx-auto flex justify-between items-end pb-4 relative z-20 border-b border-transparent dark:border-[#2d2f45]/60">
         <div>
-          <h1 className="text-3xl font-bold text-white tracking-tight mb-1">My Profile</h1>
-          <p className="text-sm text-slate-500">Manage user account credentials and view your activity statistics.</p>
+          <h1 className="text-3xl font-bold text-slate-900 dark:text-white tracking-tight mb-1">My Profile</h1>
+          <p className="text-sm text-slate-500 dark:text-[#9ca3af]">Manage user account credentials and view your activity statistics.</p>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-8 mt-8">
+      <div className="max-w-7xl mx-auto px-8 mt-8 relative z-10">
         <button 
           onClick={() => router.push('/dashboard')} 
-          className="flex items-center gap-2 text-slate-400 hover:text-white text-sm mb-8 transition-colors group"
+          className="flex items-center gap-2 text-slate-500 dark:text-[#9ca3af] hover:text-slate-900 dark:hover:text-white text-sm mb-8 transition-colors group"
         >
           <ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform" />
           Back to Dashboard
@@ -103,24 +145,24 @@ export default function ProfilePage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           
           {/* Left Column: User Card */}
-          <div className="col-span-1 bg-slate-900 border border-slate-800 rounded-3xl p-8 flex flex-col items-center text-center shadow-2xl relative overflow-hidden h-fit">
-            <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/5 blur-3xl rounded-full -translate-y-1/2 translate-x-1/3 pointer-events-none"></div>
+          <div className="col-span-1 dark-card rounded-[2rem] p-8 flex flex-col items-center text-center relative overflow-hidden h-fit">
+            <div className="absolute top-0 right-0 w-64 h-64 bg-fuchsia-500/10 dark:bg-violet-500/5 blur-3xl rounded-full -translate-y-1/2 translate-x-1/3 pointer-events-none"></div>
             
-            <div className="w-32 h-32 rounded-full border border-slate-700 flex items-center justify-center font-bold text-5xl text-indigo-400 bg-slate-950 shadow-inner mb-6 relative z-10">
+            <div className="w-32 h-32 rounded-full border border-slate-200 dark:border-[#2d2f45] flex items-center justify-center font-bold text-5xl text-fuchsia-600 dark:text-violet-400 bg-slate-50 dark:bg-[#0b0e14] shadow-inner mb-6 relative z-10">
               {user.name ? user.name.charAt(0).toUpperCase() : 'U'}
             </div>
             
-            <h2 className="text-2xl font-bold text-white tracking-tight mb-1">{user.name}</h2>
-            <p className="text-sm text-slate-500 mb-6">{user.email}</p>
+            <h2 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight mb-1">{user.name}</h2>
+            <p className="text-sm text-slate-500 dark:text-[#9ca3af] mb-6">{user.email}</p>
             
-            <div className={`px-4 py-1.5 rounded-full border flex items-center gap-2 text-xs font-bold uppercase tracking-wider mb-8 bg-slate-950 ${badgeTheme}`}>
+            <div className={`px-4 py-1.5 rounded-full border flex items-center gap-2 text-xs font-bold uppercase tracking-wider mb-8 bg-slate-50 dark:bg-[#0b0e14] ${badgeTheme}`}>
               <ShieldIcon role={user.role} />
               {user.role}
             </div>
             
             <button 
               onClick={() => logout()} 
-              className="w-full py-3 px-4 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-xl text-sm font-semibold transition-all border border-slate-700"
+              className="w-full py-3 px-4 bg-slate-100 dark:bg-[#161b22] hover:bg-slate-200 dark:hover:bg-[#1e293b] text-slate-700 dark:text-gray-300 hover:text-slate-900 dark:hover:text-white rounded-xl text-sm font-semibold transition-all border border-slate-200 dark:border-[#2d2f45]"
             >
               Sign Out
             </button>
@@ -130,9 +172,9 @@ export default function ProfilePage() {
           <div className="col-span-1 lg:col-span-2 flex flex-col gap-6">
             
             {/* Stats Grid */}
-            <div className="bg-slate-900 border border-slate-800 rounded-3xl p-8 shadow-2xl">
-              <h3 className="text-lg font-semibold text-white mb-6 flex items-center gap-2">
-                <Activity size={20} className="text-indigo-400" />
+            <div className="dark-card rounded-[2rem] p-8">
+              <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-6 flex items-center gap-2">
+                <Activity size={20} className="text-fuchsia-500 dark:text-violet-400" />
                 Activity Overview
               </h3>
               
@@ -160,22 +202,58 @@ export default function ProfilePage() {
               </div>
             </div>
 
-            {/* Facial Recognition Hub (Inspiration implementation) */}
-            <div className="bg-slate-900 border border-slate-800 rounded-3xl p-8 shadow-2xl">
-              <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                <Camera size={20} className="text-fuchsia-400" />
+            {/* Facial Recognition Hub */}
+            <div className="dark-card rounded-[2rem] p-8">
+              <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+                <Camera size={20} className="text-fuchsia-500 dark:text-violet-400" />
                 Facial Recognition Hub
               </h3>
-              <p className="text-slate-400 text-sm mb-8 leading-relaxed max-w-2xl">
+              <p className="text-slate-500 dark:text-[#9ca3af] text-sm mb-8 leading-relaxed max-w-2xl">
                 Uploading a reference selfie allows our system to analyze the album directories and automatically collect all photos containing your face into a personalized section. Your facial descriptors are stored securely as mathematical embeddings.
               </p>
               
-              <div className="border-2 border-dashed border-slate-700 hover:border-fuchsia-500/50 bg-slate-950/50 rounded-2xl p-10 flex flex-col items-center justify-center text-center transition-all cursor-pointer group">
-                <div className="w-14 h-14 rounded-full bg-fuchsia-500/10 flex items-center justify-center mb-4 group-hover:scale-110 group-hover:bg-fuchsia-500/20 transition-all">
-                  <Camera size={24} className="text-fuchsia-400" />
-                </div>
-                <h4 className="text-white font-medium mb-1">Upload Selfie Reference</h4>
-                <p className="text-slate-500 text-xs">Select a clear, front-facing portrait photo</p>
+              <div 
+                onClick={() => !isUploadingSelfie && fileInputRef.current?.click()}
+                className={`border-2 border-dashed border-slate-200 dark:border-[#2d2f45] hover:border-fuchsia-500/50 dark:hover:border-violet-500/50 bg-slate-50/50 dark:bg-[#0b0e14]/50 rounded-2xl p-10 flex flex-col items-center justify-center text-center transition-all cursor-pointer group relative overflow-hidden ${isUploadingSelfie ? 'opacity-50 pointer-events-none' : ''}`}
+              >
+                {referenceUrl ? (
+                  <>
+                    <img src={referenceUrl} alt="Reference Selfie" className="absolute inset-0 w-full h-full object-cover opacity-60 group-hover:opacity-40 transition-opacity" />
+                    <div className="relative z-10 flex flex-col items-center">
+                      <div className="w-14 h-14 rounded-full bg-white/80 dark:bg-slate-900/80 backdrop-blur flex items-center justify-center mb-4 shadow-xl">
+                        {isUploadingSelfie ? (
+                          <div className="w-6 h-6 border-2 border-fuchsia-500 dark:border-fuchsia-400 border-t-transparent rounded-full animate-spin"></div>
+                        ) : (
+                          <Camera size={24} className="text-fuchsia-600 dark:text-fuchsia-400" />
+                        )}
+                      </div>
+                      <h4 className="text-slate-900 dark:text-white font-medium mb-1 drop-shadow-md">
+                        {isUploadingSelfie ? 'Uploading...' : 'Update Reference Selfie'}
+                      </h4>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="w-14 h-14 rounded-full bg-fuchsia-500/10 flex items-center justify-center mb-4 group-hover:scale-110 group-hover:bg-fuchsia-500/20 transition-all">
+                      {isUploadingSelfie ? (
+                        <div className="w-6 h-6 border-2 border-fuchsia-500 dark:border-fuchsia-400 border-t-transparent rounded-full animate-spin"></div>
+                      ) : (
+                        <Camera size={24} className="text-fuchsia-600 dark:text-fuchsia-400" />
+                      )}
+                    </div>
+                    <h4 className="text-slate-900 dark:text-white font-medium mb-1">
+                      {isUploadingSelfie ? 'Uploading...' : 'Upload Selfie Reference'}
+                    </h4>
+                    <p className="text-slate-500 text-xs">Select a clear, front-facing portrait photo</p>
+                  </>
+                )}
+                <input 
+                  type="file" 
+                  ref={fileInputRef} 
+                  className="hidden" 
+                  accept="image/jpeg, image/png, image/webp" 
+                  onChange={handleSelfieUpload} 
+                />
               </div>
             </div>
 
@@ -197,11 +275,11 @@ function ShieldIcon({ role }: { role: string }) {
 
 function StatCard({ icon, label, value }: { icon: React.ReactNode, label: string, value: string }) {
   return (
-    <div className="bg-slate-950 border border-slate-800 p-5 rounded-2xl flex flex-col items-center text-center">
-      <div className="w-10 h-10 rounded-full bg-slate-900 border border-slate-800 flex items-center justify-center mb-3">
+    <div className="bg-slate-50 dark:bg-[#161b22] border border-slate-200 dark:border-[#2d2f45] p-5 rounded-2xl flex flex-col items-center text-center">
+      <div className="w-10 h-10 rounded-full bg-white dark:bg-[#1a1c2e] border border-slate-200 dark:border-[#2d2f45] flex items-center justify-center mb-3 shadow-sm">
         {icon}
       </div>
-      <p className="text-2xl font-bold text-white mb-1">{value}</p>
+      <p className="text-2xl font-bold text-slate-900 dark:text-white mb-1">{value}</p>
       <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{label}</h4>
     </div>
   );

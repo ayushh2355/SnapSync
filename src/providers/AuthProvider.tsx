@@ -30,7 +30,7 @@ const AuthContext = createContext<AuthContextType>({
 });
 
 function setTokenCookie(token: string, maxAge: number) {
-  document.cookie = `token=${token}; path=/; max-age=${maxAge}; SameSite=Strict`;
+  document.cookie = `token=${token}; path=/; max-age=${maxAge}; SameSite=Lax`;
 }
 
 function clearTokenCookie() {

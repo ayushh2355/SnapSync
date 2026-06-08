@@ -27,6 +27,9 @@ const UserSchema = new mongoose.Schema(
       enum: ['Admin', 'Photographer', 'Club Member', 'Viewer'],
       default: 'Viewer',
     },
+    faceReferenceUrl: {
+      type: String,
+    },
   },
   { timestamps: true }
 );

@@ -104,15 +104,15 @@ export const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, event
     <Modal isOpen={isOpen} onClose={onClose} title="Upload Media">
       <div className="space-y-4">
         <div 
-          className={`border-2 border-dashed rounded-xl p-8 flex flex-col items-center justify-center text-center cursor-pointer transition-colors ${isDragging ? 'border-blue-500 bg-blue-500/10' : 'border-gray-700 hover:border-gray-500'}`}
+          className={`border-2 border-dashed rounded-2xl p-8 flex flex-col items-center justify-center text-center cursor-pointer transition-all ${isDragging ? 'border-fuchsia-400 bg-fuchsia-50/50 shadow-inner' : 'border-slate-300 hover:border-fuchsia-300 hover:bg-slate-50/50 hover:shadow-sm bg-white/40'}`}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
           onClick={() => fileInputRef.current?.click()}
         >
-          <UploadCloud size={48} className="text-gray-500 mb-4" />
-          <p className="text-white font-medium mb-1">Click or drag files to this area to upload</p>
-          <p className="text-gray-400 text-sm">Support for multiple images or video files.</p>
+          <UploadCloud size={48} className="text-fuchsia-500 mb-4 drop-shadow-sm" />
+          <p className="text-slate-900 font-bold mb-1 tracking-tight">Click or drag files to this area to upload</p>
+          <p className="text-slate-500 text-sm font-medium">Support for multiple images or video files.</p>
           <input 
             type="file" 
             className="hidden" 
@@ -126,15 +126,15 @@ export const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, event
         {files.length > 0 && (
           <div className="max-h-48 overflow-y-auto space-y-2 pr-2">
             {files.map((f, i) => (
-              <div key={i} className="p-3 border border-gray-700 rounded-lg flex items-center justify-between bg-gray-800/50">
+              <div key={i} className="p-3 border border-slate-200/80 rounded-xl flex items-center justify-between bg-white shadow-sm">
                 <div className="truncate flex-1 pr-4">
-                  <p className="text-white font-medium text-sm truncate">{f.name}</p>
-                  <p className="text-gray-400 text-xs">{(f.size / (1024 * 1024)).toFixed(2)} MB</p>
+                  <p className="text-slate-900 font-semibold text-sm truncate">{f.name}</p>
+                  <p className="text-slate-500 text-xs font-medium">{(f.size / (1024 * 1024)).toFixed(2)} MB</p>
                 </div>
                 <button 
                   onClick={() => setFiles(files.filter((_, index) => index !== i))} 
                   disabled={isUploading}
-                  className="text-red-400 hover:text-red-300 text-xs font-semibold uppercase tracking-wider"
+                  className="text-red-500 hover:text-red-700 hover:bg-red-50 p-1.5 rounded-lg transition-colors text-xs font-bold uppercase tracking-wider"
                 >
                   Remove
                 </button>
@@ -143,9 +143,9 @@ export const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, event
           </div>
         )}
 
-        <div className="flex justify-end gap-3 pt-4 border-t border-gray-800">
-          <Button variant="ghost" onClick={onClose} disabled={isUploading}>Cancel</Button>
-          <Button onClick={handleUpload} disabled={files.length === 0 || isUploading} isLoading={isUploading}>
+        <div className="flex justify-end gap-3 pt-6 border-t border-slate-200/60 mt-2">
+          <Button variant="ghost" onClick={onClose} disabled={isUploading} className="text-slate-600 hover:text-slate-900 hover:bg-slate-100/80 font-semibold rounded-xl">Cancel</Button>
+          <Button onClick={handleUpload} disabled={files.length === 0 || isUploading} isLoading={isUploading} className="bg-gradient-to-r from-fuchsia-600 to-purple-600 hover:from-fuchsia-500 hover:to-purple-500 text-white border-none shadow-[0_8px_20px_rgba(217,70,239,0.3)] rounded-xl px-6">
             Upload {files.length > 0 ? `${files.length} File${files.length > 1 ? 's' : ''}` : 'Files'}
           </Button>
         </div>

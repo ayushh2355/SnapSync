@@ -1,44 +1,74 @@
 import UserReference from '@/models/UserReference';
-
-const MATCH_THRESHOLD = 50;
-const FACE_VECTOR_LENGTH = 4;
+import { S3Service } from '@/services/s3.service';
+import { GoogleGenAI } from '@google/genai';
 
 export class FaceService {
-  static async detectFaces(buffer: Buffer): Promise<number[]> {
-    const size = buffer.length;
-    return [
-      size % 100,
-      (size * 2) % 100,
-      (size * 3) % 100,
-      (size * 4) % 100,
-    ];
-  }
+  static async detectAndMatchFaces(targetBuffer: Buffer, targetMimeType: string = 'image/jpeg'): Promise<string[]> {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      console.warn('GEMINI_API_KEY is not set, skipping face matching');
+      return [];
+    }
 
-  static async findMatchingUsers(faceMetadata: number[]): Promise<string[]> {
-    if (!faceMetadata || faceMetadata.length === 0) return [];
+    const references = await UserReference.find({ selfieUrl: { $exists: true } }).lean();
+    if (!references || references.length === 0) return [];
 
-    const references = await UserReference.find(
-      { faceMetadata: { $exists: true, $not: { $size: 0 } } },
-      { userId: 1, faceMetadata: { $slice: FACE_VECTOR_LENGTH } }
-    ).lean();
-
-    const matchedUserIds: string[] = [];
+    const ai = new GoogleGenAI({ apiKey });
+    
+    // Construct parts array for Gemini
+    // We send each reference image along with a text label identifying the user ID
+    const parts: any[] = [];
+    
+    parts.push({
+      text: 'You are a highly accurate facial recognition system. I will provide you with reference images of several people, each labeled with their unique User ID. After the reference images, I will provide a Target Image. Your task is to identify which of the reference people are present in the Target Image. Return ONLY a JSON array of strings containing the User IDs of the matched people. Do not include markdown formatting or explanations. If no one matches, return an empty array [].'
+    });
 
     for (const ref of references) {
-      const refMeta = ref.faceMetadata as number[];
-      if (!Array.isArray(refMeta) || refMeta.length === 0) continue;
-
-      let diff = 0;
-      const len = Math.min(faceMetadata.length, refMeta.length);
-      for (let i = 0; i < len; i++) {
-        diff += Math.abs(faceMetadata[i] - refMeta[i]);
-      }
-
-      if (diff < MATCH_THRESHOLD) {
-        matchedUserIds.push((ref.userId as { toString(): string }).toString());
+      try {
+        const refKey = ref.selfieKey || ('media/' + ref.selfieUrl.split('/').pop());
+        const refBuffer = await S3Service.getFileBuffer(refKey);
+        parts.push({ text: `Reference User ID: ${(ref.userId as any).toString()}` });
+        parts.push({
+          inlineData: {
+            mimeType: 'image/jpeg', // Assume jpeg or let Gemini figure it out
+            data: refBuffer.toString('base64'),
+          },
+        });
+      } catch (err) {
+        console.error(`Failed to load reference image for user ${ref.userId}:`, err);
       }
     }
 
-    return matchedUserIds;
+    parts.push({ text: 'Target Image:' });
+    parts.push({
+      inlineData: {
+        mimeType: targetMimeType,
+        data: targetBuffer.toString('base64'),
+      },
+    });
+
+    try {
+      const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: [{ role: 'user', parts }],
+      });
+
+      const text = response.text || '[]';
+      const cleaned = text.replace(/```json\n?|```\n?/g, '').trim();
+      const parsed = JSON.parse(cleaned);
+      if (!Array.isArray(parsed)) return [];
+      return parsed.filter((id): id is string => typeof id === 'string');
+    } catch (error) {
+      console.error('FaceService.detectAndMatchFaces failed:', error);
+      return [];
+    }
+  }
+
+  // Deprecated dummy methods kept for compatibility temporarily
+  static async detectFaces(buffer: Buffer): Promise<number[]> {
+    return [];
+  }
+  static async findMatchingUsers(faceMetadata: number[]): Promise<string[]> {
+    return [];
   }
 }

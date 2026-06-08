@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
-import { Heart, MessageCircle, Download, Loader2, Search, Filter } from 'lucide-react';
+import { Heart, MessageCircle, Download, Loader2, Search, Filter, Maximize2 } from 'lucide-react';
 import { Lightbox } from './Lightbox';
 import { useWatermarkDownload } from '@/hooks/use-watermark-download';
 import { toDisplayUrl } from '@/lib/cloudinaryUrl';
@@ -78,7 +78,7 @@ export const ImageGrid: React.FC<ImageGridProps> = ({ mediaList, clubName, event
       {items.map((media) => (
         <div
           key={media._id}
-          className="relative group overflow-hidden rounded-xl border border-white/5 bg-slate-900 cursor-pointer aspect-square shadow-sm"
+          className="relative group overflow-hidden rounded-2xl border border-white/40 bg-white/40 cursor-pointer h-64 shadow-sm"
           onClick={() => setSelectedIndex(filteredMedia.findIndex(m => m._id === media._id))}
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -86,36 +86,54 @@ export const ImageGrid: React.FC<ImageGridProps> = ({ mediaList, clubName, event
             src={toDisplayUrl(media.fileUrl)}
             crossOrigin="anonymous"
             alt="Event media"
-            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+            className="w-full h-full object-cover object-top transition-transform duration-500 group-hover:scale-105"
             loading="lazy"
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-4">
+          
+          {/* Always visible or hover-visible likes at bottom left */}
+          <div className="absolute bottom-3 left-3 z-10 flex items-center gap-1.5 opacity-80 group-hover:opacity-100 transition-opacity">
+            {(media.likesCount || 0) > 0 && (
+              <div className="bg-black/40 backdrop-blur-md px-2.5 py-1 rounded-full text-white text-xs font-medium flex items-center gap-1.5">
+                <Heart size={12} className="fill-white" />
+                {media.likesCount}
+              </div>
+            )}
+            {(media.commentsCount || 0) > 0 && (
+              <div className="bg-black/40 backdrop-blur-md px-2.5 py-1 rounded-full text-white text-xs font-medium flex items-center gap-1.5">
+                <MessageCircle size={12} className="text-white" />
+                {media.commentsCount}
+              </div>
+            )}
+          </div>
+
+          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-4">
+            {/* Download button stays interactive */}
             <button
               onClick={(e) => handleCardDownload(e, media)}
               disabled={isDownloading}
-              className="absolute top-3 right-3 p-2.5 rounded-xl bg-black/40 hover:bg-indigo-600 backdrop-blur-md text-white transition-all hover:scale-110 active:scale-95 disabled:opacity-50"
+              className="absolute top-3 right-3 p-2.5 rounded-xl bg-black/40 hover:bg-indigo-600 backdrop-blur-md text-white transition-all hover:scale-110 active:scale-95 disabled:opacity-50 z-20"
             >
               {downloadingId === media._id
                 ? <Loader2 size={16} className="animate-spin" />
                 : <Download size={16} />}
             </button>
-            <div className="flex gap-4 mb-2 text-white">
-              <span className="flex items-center gap-1.5 text-xs font-semibold">
-                <Heart size={14} className="text-red-500 fill-red-500" /> {media.likesCount || 0}
-              </span>
-              <span className="flex items-center gap-1.5 text-xs font-semibold">
-                <MessageCircle size={14} className="text-blue-400" /> {media.commentsCount || 0}
-              </span>
+            
+            {/* Centered Expand Icon */}
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <div className="w-12 h-12 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center transform scale-90 group-hover:scale-100 transition-transform duration-200">
+                <Maximize2 size={20} className="text-white" />
+              </div>
             </div>
+
             {media.tags && media.tags.length > 0 && (
-              <div className="flex flex-wrap gap-1.5 mt-2">
+              <div className="absolute bottom-3 right-3 flex flex-wrap justify-end gap-1.5 pointer-events-none">
                 {media.tags.slice(0, 3).map(tag => (
-                  <span key={tag} className="text-[10px] font-medium bg-white/10 text-white border border-white/10 px-2 py-0.5 rounded-md backdrop-blur-md">
+                  <span key={tag} className="text-[10px] font-medium bg-white/20 text-white border border-white/10 px-2 py-0.5 rounded-md backdrop-blur-md">
                     {tag}
                   </span>
                 ))}
                 {media.tags.length > 3 && (
-                  <span className="text-[10px] font-medium bg-white/10 text-white border border-white/10 px-2 py-0.5 rounded-md backdrop-blur-md">
+                  <span className="text-[10px] font-medium bg-white/20 text-white border border-white/10 px-2 py-0.5 rounded-md backdrop-blur-md">
                     +{media.tags.length - 3}
                   </span>
                 )}
@@ -137,33 +155,35 @@ export const ImageGrid: React.FC<ImageGridProps> = ({ mediaList, clubName, event
 
   return (
     <>
-      <div className="flex flex-col sm:flex-row items-center gap-4 mb-8 bg-slate-900/40 p-3 sm:p-4 rounded-2xl border border-white/5 shadow-lg">
+      <div className="flex flex-col sm:flex-row items-center gap-4 mb-8 bg-white/40 bg-gradient-to-r from-fuchsia-500/5 via-fuchsia-500/5 to-transparent backdrop-blur-md border border-fuchsia-400/30 rounded-[20px] p-4 shadow-[0_15px_40px_rgba(217,70,239,0.1)] hover:shadow-[0_0_60px_rgba(217,70,239,0.3)] hover:border-fuchsia-500/50 transition-all duration-500">
         <div className="relative flex-1 w-full">
-          <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" />
+          <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-400" />
           <input 
             type="text" 
             value={searchTerm}
             onChange={e => setSearchTerm(e.target.value)}
             placeholder="Search tags or uploader name..."
-            className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-11 pr-4 py-3 text-sm text-white focus:outline-none focus:border-indigo-500 transition-colors"
+            className="w-full bg-white/60 dark:bg-slate-950/50 border border-fuchsia-200/50 dark:border-white/10 rounded-xl pl-11 pr-4 py-2.5 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-fuchsia-500 dark:focus:border-white/30 transition-colors placeholder:text-slate-400 dark:placeholder:text-white/40"
           />
         </div>
         <div className="relative w-full sm:w-auto min-w-[200px]">
           <select
             value={selectedUploader}
             onChange={e => setSelectedUploader(e.target.value)}
-            className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-4 pr-10 py-3 text-sm text-white appearance-none focus:outline-none focus:border-indigo-500 transition-colors"
+            className="w-full bg-white/60 dark:bg-slate-950/50 border border-fuchsia-200/50 dark:border-white/10 rounded-xl pl-4 pr-10 py-2.5 text-sm text-slate-900 dark:text-white appearance-none focus:outline-none focus:border-fuchsia-500 dark:focus:border-white/30 transition-colors"
           >
             <option value="all">✓ All Uploaders</option>
             {uniqueUploaders.map(u => (
               <option key={u.id} value={u.id}>{u.name}</option>
             ))}
           </select>
-          <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-500">
+          <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400 dark:text-slate-400">
             <Filter size={16} />
           </div>
         </div>
       </div>
+
+      <div className="rounded-[28px] border border-fuchsia-400/30 bg-gradient-to-br from-fuchsia-500/10 via-fuchsia-500/5 to-transparent backdrop-blur-md shadow-[0_30px_80px_rgba(217,70,239,0.15)] hover:shadow-[0_0_100px_rgba(217,70,239,0.4)] hover:border-fuchsia-500/60 p-6 sm:p-8 min-h-[400px] transition-all duration-500 bg-white/40">
 
       {filteredMedia.length === 0 ? (
         <div className="text-slate-500 text-center py-20 bg-slate-900/40 border border-white/5 rounded-2xl">
@@ -173,11 +193,11 @@ export const ImageGrid: React.FC<ImageGridProps> = ({ mediaList, clubName, event
         <div className="space-y-10">
           {myUploads.length > 0 && (
             <div>
-              <div className="flex items-center gap-4 mb-5">
-                <h3 className="text-xs font-bold tracking-widest text-indigo-400 uppercase bg-indigo-500/10 px-3 py-1.5 rounded-lg border border-indigo-500/20">
-                  Your Uploads
-                </h3>
-                <div className="h-px bg-white/5 flex-1" />
+              <div className="flex items-center gap-4 mb-8">
+                <h3 className="text-2xl lg:text-3xl font-semibold text-slate-900 tracking-tight">Your Uploads</h3>
+                <div className="bg-white/30 backdrop-blur-sm rounded-full px-3 py-1 text-sm border border-white/40 shadow-sm text-slate-800 font-medium">
+                  {myUploads.length} Photo{myUploads.length !== 1 ? 's' : ''}
+                </div>
               </div>
               {renderGridItems(myUploads)}
             </div>
@@ -186,11 +206,11 @@ export const ImageGrid: React.FC<ImageGridProps> = ({ mediaList, clubName, event
           {otherUploads.length > 0 && (
             <div>
               {myUploads.length > 0 && (
-                <div className="flex items-center gap-4 mb-5">
-                  <h3 className="text-xs font-bold tracking-widest text-slate-500 uppercase">
-                    Other Images
-                  </h3>
-                  <div className="h-px bg-white/5 flex-1" />
+                <div className="flex items-center gap-4 mb-8">
+                  <h3 className="text-2xl lg:text-3xl font-semibold text-slate-900 tracking-tight">Other Images</h3>
+                  <div className="bg-white/30 backdrop-blur-sm rounded-full px-3 py-1 text-sm border border-white/40 shadow-sm text-slate-800 font-medium">
+                    {otherUploads.length} Photo{otherUploads.length !== 1 ? 's' : ''}
+                  </div>
                 </div>
               )}
               {renderGridItems(otherUploads)}
@@ -198,6 +218,7 @@ export const ImageGrid: React.FC<ImageGridProps> = ({ mediaList, clubName, event
           )}
         </div>
       )}
+      </div>
 
       <Lightbox 
         isOpen={selectedIndex !== null}

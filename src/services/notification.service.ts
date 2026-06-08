@@ -20,7 +20,7 @@ export class NotificationService {
   static async createNotification(data: {
     recipientId: string;
     actorId: string;
-    type: 'like' | 'comment';
+    type: 'like' | 'comment' | 'tag';
     mediaId: string;
     commentId?: string;
   }) {

@@ -3,13 +3,33 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-surface-elevated: var(--surface-elevated);
+  --color-border: var(--border);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
 :root {
-  --background: #0a0a0a;
-  --foreground: #ededed;
+  --background: #f5f8fc;
+  --foreground: #1e293b;
+  --surface: rgba(255, 255, 255, 0.45);
+  --surface-elevated: #ffffff;
+  --border: #e2e8f0;
+  --muted: #64748b;
+  --accent: #7c3aed;
+}
+
+.dark {
+  --background: #0b0e14;
+  --foreground: #f3f4f6;
+  --surface: #161b22;
+  --surface-elevated: #1a1c2e;
+  --border: #2d2f45;
+  --muted: #9ca3af;
+  --accent: #8b5cf6;
 }
 
 body {
@@ -20,4 +40,69 @@ body {
 
 html {
   scroll-behavior: smooth;
+}
+
+/* Light glass card */
+.glass-card {
+  background: rgba(255, 255, 255, 0.45);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.06);
+}
+
+/* Dark elevated surface — matches reference dashboard cards */
+.dark .glass-card {
+  background: var(--surface-elevated);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border: 1px solid var(--border);
+  box-shadow: none;
+}
+
+.dark-card {
+  background: var(--surface-elevated);
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+}
+
+.dark .dark-card {
+  background: var(--surface-elevated);
+  border-color: var(--border);
+}
+
+/* Dark mode input surface */
+.dark-input {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--foreground);
+}
+
+.dark .dark-input {
+  background: var(--surface);
+  border-color: var(--border);
+}
+
+.dark .dark-input::placeholder {
+  color: var(--muted);
+}
+
+.dark .dark-input:focus {
+  border-color: var(--accent);
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.25);
+}
+
+/* Primary accent button — purple in dark mode */
+.btn-accent {
+  background: linear-gradient(to right, #7c3aed, #db2777);
+  color: white;
+}
+
+.dark .btn-accent {
+  background: #8b5cf6;
+}
+
+.dark .btn-accent:hover {
+  background: #7c3aed;
 }

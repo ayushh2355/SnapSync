@@ -3,6 +3,8 @@ import { authenticate } from '@/middlewares/auth';
 import connectToDatabase from '@/lib/db';
 import { NotificationService } from '@/services/notification.service';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(req: NextRequest) {
   try {
     await connectToDatabase();

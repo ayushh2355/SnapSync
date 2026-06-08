@@ -29,24 +29,24 @@ export const NotificationBell: React.FC = () => {
     <div className="relative" ref={dropdownRef}>
       <button 
         onClick={() => setIsOpen(!isOpen)}
-        className="relative w-10 h-10 rounded-full flex items-center justify-center text-slate-300 hover:text-white hover:bg-slate-800 transition-colors"
+        className="relative w-11 h-11 rounded-full flex items-center justify-center bg-rose-500/10 text-rose-600 hover:bg-rose-500/20 transition-all shadow-[0_0_20px_rgba(244,63,94,0.15)] hover:shadow-[0_0_25px_rgba(244,63,94,0.25)] border border-rose-500/10"
       >
         <Bell size={20} />
         {unreadCount > 0 && (
-          <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-bold text-white">
+          <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-rose-500 text-[10px] font-bold text-white shadow-sm border-[2px] border-white">
             {unreadCount > 99 ? '99+' : unreadCount}
           </span>
         )}
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-80 bg-[#0f172a] border border-gray-800 rounded-xl shadow-xl overflow-hidden z-50">
-          <div className="p-4 border-b border-gray-800 flex justify-between items-center bg-slate-900/50">
-            <h3 className="font-semibold text-white">Notifications</h3>
+        <div className="absolute right-0 mt-3 w-80 rounded-[28px] border border-fuchsia-400/30 bg-gradient-to-br from-fuchsia-500/10 via-fuchsia-500/5 to-transparent backdrop-blur-xl shadow-[0_30px_80px_rgba(217,70,239,0.15)] bg-white/40 overflow-hidden z-50">
+          <div className="p-5 border-b border-fuchsia-400/20 flex justify-between items-center">
+            <h3 className="font-semibold text-slate-900 text-lg">Notifications</h3>
             {unreadCount > 0 && (
               <button 
                 onClick={markAllAsRead}
-                className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1"
+                className="text-xs text-rose-500 hover:text-rose-600 flex items-center gap-1 font-medium"
               >
                 <Check size={14} /> Mark all read
               </button>
@@ -55,15 +55,16 @@ export const NotificationBell: React.FC = () => {
           
           <div className="max-h-[400px] overflow-y-auto">
             {notifications.length === 0 ? (
-              <div className="p-6 text-center text-gray-500 text-sm">
-                You have no notifications.
+              <div className="py-12 px-6 flex flex-col items-center justify-center text-center">
+                <Bell className="text-slate-400 w-10 h-10 mb-3 stroke-[1.5]" />
+                <p className="text-slate-500 text-sm">No notifications</p>
               </div>
             ) : (
               notifications.map((notif) => (
                 <div 
                   key={notif._id} 
                   onClick={() => handleNotificationClick(notif)}
-                  className={`p-4 border-b border-gray-800 hover:bg-slate-800/50 transition-colors cursor-pointer ${notif.isRead ? 'opacity-70' : 'bg-slate-800/30'}`}
+                  className={`p-4 border-b border-slate-100 dark:border-white/10 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors cursor-pointer ${notif.isRead ? 'opacity-70' : 'bg-slate-50 dark:bg-white/5'}`}
                 >
                   <div className="flex gap-3">
                     <div className="mt-1">
@@ -76,11 +77,11 @@ export const NotificationBell: React.FC = () => {
                       )}
                     </div>
                     <div>
-                      <p className="text-sm text-gray-300">
-                        <span className="font-semibold text-white">{notif.actorId?.name || 'Someone'}</span>{' '}
+                      <p className="text-sm text-slate-700 dark:text-gray-300">
+                        <span className="font-semibold text-slate-900 dark:text-white">{notif.actorId?.name || 'Someone'}</span>{' '}
                         {notif.type === 'like' ? 'liked your photo.' : notif.type === 'tag' ? 'tagged you in a photo!' : 'commented on your photo.'}
                       </p>
-                      <span className="text-xs text-gray-500 mt-1 block">
+                      <span className="text-xs text-slate-500 dark:text-gray-500 mt-1 block">
                         {new Date(notif.createdAt).toLocaleDateString()} at {new Date(notif.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </span>
                     </div>

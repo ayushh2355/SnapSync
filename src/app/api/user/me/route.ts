@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { authenticate } from '@/middlewares/auth';
 import connectToDatabase from '@/lib/db';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(req: NextRequest) {
   try {
     await connectToDatabase();
@@ -14,7 +16,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ 
       success: true, 
       data: { 
-        id: user._id.toString(),
+        id: user.id,
         name: user.name, 
         email: user.email, 
         role: user.role 

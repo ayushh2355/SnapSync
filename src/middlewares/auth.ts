@@ -12,6 +12,8 @@ const JWT_SECRET = process.env.JWT_SECRET;
 export interface AuthUser {
   id: string;
   role: string;
+  name: string;
+  email: string;
 }
 
 function extractToken(req: NextRequest): string | null {
@@ -48,6 +50,8 @@ export async function authenticate(req: NextRequest): Promise<AuthUser | null> {
     return {
       id: (user._id as { toString(): string }).toString(),
       role: (user as { role: string }).role,
+      name: (user as { name: string }).name,
+      email: (user as { email: string }).email,
     };
   } catch {
     return null;

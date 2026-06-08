@@ -6,6 +6,7 @@ import { MediaService } from '@/services/media.service';
 import { VisionService } from '@/services/vision.service';
 import { FaceService } from '@/services/face.service';
 import { SharingService } from '@/services/sharing.service';
+import { NotificationService } from '@/services/notification.service';
 import crypto from 'crypto';
 import sharp from 'sharp';
 
@@ -77,20 +78,20 @@ export class MediaController {
       let detectedUsers: string[] = [];
 
       if (fileType === 'image') {
-        const [aiTags, faceMetadata] = await Promise.all([
+        const [aiTags, matchedUserIds] = await Promise.all([
           VisionService.generateTags(buffer),
-          FaceService.detectFaces(buffer),
+          FaceService.detectAndMatchFaces(buffer, file.type),
         ]);
         finalTags = Array.from(new Set([...finalTags, ...aiTags]));
-        detectedUsers = await FaceService.findMatchingUsers(faceMetadata);
+        detectedUsers = matchedUserIds;
       }
 
-      let processedBuffer = buffer;
+      let processedBuffer: Buffer = buffer;
       let processedMime = file.type;
 
       if (file.type === 'image/heic' || file.type === 'image/heif') {
         try {
-          processedBuffer = await sharp(buffer).jpeg().toBuffer();
+          processedBuffer = (await sharp(buffer).jpeg().toBuffer()) as unknown as Buffer;
           processedMime = 'image/jpeg';
         } catch {
           processedBuffer = buffer;
@@ -113,6 +114,18 @@ export class MediaController {
           detectedUsers,
           hash: fileHash,
         });
+
+        // Trigger notifications for auto-tagged users
+        for (const taggedUserId of detectedUsers) {
+          if (taggedUserId !== user.id) {
+            await NotificationService.createNotification({
+              recipientId: taggedUserId,
+              actorId: user.id,
+              type: 'tag',
+              mediaId: mediaRecord._id.toString(),
+            });
+          }
+        }
 
         return NextResponse.json({ success: true, data: mediaRecord }, { status: 201 });
       } catch (dbError: unknown) {

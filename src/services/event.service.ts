@@ -1,4 +1,5 @@
 import Event from '@/models/Event';
+import Media from '@/models/Media';
 
 const ALLOWED_SORT_FIELDS = new Set(['createdAt', 'name', 'date', 'category']);
 
@@ -67,11 +68,27 @@ export class EventService {
       sortObj.createdAt = -1;
     }
 
-    return Event.find(filter)
+    const events = await Event.find(filter)
       .sort(sortObj)
       .limit(Math.min(limit, 100))
       .skip(Math.max(skip, 0))
       .lean();
+
+    // Fetch the first photo for each event to serve as a cover
+    const eventsWithCovers = await Promise.all(
+      events.map(async (event) => {
+        const media = await Media.findOne({ eventId: event._id, fileType: 'image' })
+          .sort({ createdAt: 1 })
+          .select('fileUrl')
+          .lean();
+        return {
+          ...event,
+          coverImage: media ? media.fileUrl : null,
+        };
+      })
+    );
+
+    return eventsWithCovers;
   }
 
   static async getEventById(id: string) {

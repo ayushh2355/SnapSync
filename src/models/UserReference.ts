@@ -12,6 +12,10 @@ const UserReferenceSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    selfieKey: {
+      type: String,
+      required: true,
+    },
     faceMetadata: {
       type: [Number],
       required: true,

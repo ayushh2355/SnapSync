@@ -40,4 +40,11 @@ export class MediaService {
       .skip(skip)
       .lean();
   }
+  static async getMediaById(mediaId: string) {
+    return Media.findById(mediaId).lean();
+  }
+
+  static async deleteMediaRecord(mediaId: string) {
+    return Media.findByIdAndDelete(mediaId);
+  }
 }

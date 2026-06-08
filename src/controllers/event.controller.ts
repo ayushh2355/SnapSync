@@ -23,7 +23,11 @@ export class EventController {
         }
       }
 
-      const events = await EventService.getEvents(query);
+      if (user.role === 'Viewer') {
+        query.excludePrivate = 'true';
+      }
+
+      const events = await EventService.getEvents(query as any);
       return NextResponse.json({ success: true, data: events }, { status: 200 });
     } catch (error: unknown) {
       return NextResponse.json({ success: false, error: (error as Error).message }, { status: 500 });
@@ -40,7 +44,7 @@ export class EventController {
       }
 
       const body = await req.json();
-      const { name, date, description, category } = body;
+      const { name, date, description, category, isPrivate } = body;
 
       if (!name || !date || !category) {
         return NextResponse.json(
@@ -54,6 +58,7 @@ export class EventController {
         date,
         description,
         category,
+        isPrivate: Boolean(isPrivate),
         createdBy: user!.id,
       });
 
@@ -75,6 +80,10 @@ export class EventController {
       const event = await EventService.getEventById(id);
       if (!event) {
         return NextResponse.json({ success: false, error: 'Event not found' }, { status: 404 });
+      }
+
+      if (event.isPrivate && user.role === 'Viewer') {
+        return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
       }
 
       return NextResponse.json({ success: true, data: event }, { status: 200 });

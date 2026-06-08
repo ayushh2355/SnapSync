@@ -9,7 +9,7 @@ export class AuthController {
     try {
       await connectToDatabase();
       const body = await req.json();
-      const { name, email, password } = body;
+      const { name, email, password, role } = body;
 
       if (!name || !email || !password) {
         return NextResponse.json(
@@ -29,14 +29,14 @@ export class AuthController {
         );
       }
 
-      const user = await AuthService.register({ name, email, password });
+      const user = await AuthService.register({ name, email, password, role });
       return NextResponse.json({ success: true, data: user }, { status: 201 });
     } catch (error: unknown) {
       const message = (error as Error).message;
       const isClientError = message.toLowerCase().includes('already exists') || message.toLowerCase().includes('duplicate');
       return NextResponse.json(
-        { success: false, error: isClientError ? message : 'Registration failed' },
-        { status: isClientError ? 409 : 500 }
+        { success: false, error: message },
+        { status: isClientError ? 409 : 400 }
       );
     }
   }
@@ -65,13 +65,13 @@ export class AuthController {
     try {
       await connectToDatabase();
       const body = await req.json();
-      const { idToken } = body;
+      const { idToken, role } = body;
 
       if (!idToken || typeof idToken !== 'string') {
         return NextResponse.json({ success: false, error: 'Google idToken is required' }, { status: 400 });
       }
 
-      const result = await AuthService.googleLogin(idToken);
+      const result = await AuthService.googleLogin(idToken, role);
       return NextResponse.json({ success: true, data: result }, { status: 200 });
     } catch (error: unknown) {
       return NextResponse.json({ success: false, error: GENERIC_AUTH_ERROR }, { status: 401 });

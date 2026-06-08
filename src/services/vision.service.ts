@@ -43,7 +43,7 @@ export class VisionService {
             role: 'user',
             parts: [
               {
-                text: 'Analyze this image and return a JSON array of up to 10 descriptive single-word tags. Return ONLY the raw JSON array with no markdown formatting.',
+                text: 'Analyze this image and return a JSON array of up to 10 highly descriptive tags. Be specific: identify if it is a "selfie", specify genders (e.g., "woman", "man", "group"), and identify prominent objects (e.g., "car", "building", "nature"). Return ONLY the raw JSON array of strings with no markdown formatting.',
               },
               {
                 inlineData: {

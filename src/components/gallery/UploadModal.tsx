@@ -49,6 +49,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, event
     setIsUploading(true);
 
     let successCount = 0;
+    let duplicateCount = 0;
     let failCount = 0;
 
     for (const file of Array.from(files)) {
@@ -64,27 +65,37 @@ export const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, event
         });
         successCount++;
       } catch (err: unknown) {
-        console.error('Failed to upload', file.name, err);
-        failCount++;
+        const message = (err as Error).message ?? '';
+        if (message.toLowerCase().includes('duplicate')) {
+          duplicateCount++;
+          toast({
+            title: 'Duplicate Photo',
+            description: `"${file.name}" already exists in this event and was skipped.`,
+            variant: 'destructive',
+          });
+        } else {
+          failCount++;
+          toast({
+            title: 'Upload Failed',
+            description: `"${file.name}" could not be uploaded. It may be too large or an unsupported format.`,
+            variant: 'destructive',
+          });
+        }
       }
     }
 
     setIsUploading(false);
 
-    if (failCount === 0) {
+    if (successCount > 0) {
       toast({
-        title: 'Success',
-        description: `Successfully uploaded ${successCount} file(s)!`,
-      });
-    } else {
-      toast({
-        title: 'Upload Complete with Errors',
-        description: `Uploaded ${successCount} file(s). ${failCount} failed (duplicates or too large).`,
-        variant: failCount === files.length ? 'destructive' : 'default',
+        title: 'Upload Complete',
+        description: `Successfully uploaded ${successCount} file${successCount !== 1 ? 's' : ''}.`,
       });
     }
 
-    onUploadSuccess();
+    if (successCount > 0 || duplicateCount > 0 || failCount > 0) {
+      onUploadSuccess();
+    }
     setFiles([]);
     onClose();
   };

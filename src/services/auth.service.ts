@@ -29,8 +29,8 @@ function buildUserPayload(user: { _id: unknown; name: string; email: string; rol
 }
 
 export class AuthService {
-  static async register(data: { name: string; email: string; password: string }) {
-    const { name, email, password } = data;
+  static async register(data: { name: string; email: string; password: string; role?: string }) {
+    const { name, email, password, role } = data;
 
     const existingUser = await User.findOne({ email }).lean();
     if (existingUser) {
@@ -43,7 +43,7 @@ export class AuthService {
       name,
       email,
       password: hashedPassword,
-      role: 'Viewer',
+      role: role || 'Viewer',
     });
 
     return buildUserPayload(user);
@@ -66,7 +66,7 @@ export class AuthService {
     return { token, user: buildUserPayload(user) };
   }
 
-  static async googleLogin(idToken: string) {
+  static async googleLogin(idToken: string, role?: string) {
     const ticket = await googleClient.verifyIdToken({
       idToken,
       audience: GOOGLE_CLIENT_ID,
@@ -81,7 +81,7 @@ export class AuthService {
 
     const user = await User.findOneAndUpdate(
       { email },
-      { $setOnInsert: { name, email, googleId, role: 'Viewer' }, $set: { name, googleId } },
+      { $setOnInsert: { name, email, googleId, role: role || 'Viewer' }, $set: { name, googleId } },
       { new: true, upsert: true }
     );
 

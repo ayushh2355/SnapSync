@@ -9,6 +9,7 @@ interface EventQueryParams {
   sort?: string;
   limit?: number;
   skip?: number;
+  excludePrivate?: boolean;
 }
 
 interface CreateEventData {
@@ -16,6 +17,7 @@ interface CreateEventData {
   date: string;
   category: string;
   description?: string;
+  isPrivate?: boolean;
   createdBy: string;
 }
 
@@ -37,6 +39,9 @@ export class EventService {
 
     if (name) {
       filter.name = { $regex: name, $options: 'i' };
+    }
+    if (params.excludePrivate) {
+      filter.isPrivate = { $ne: true };
     }
     if (category) {
       filter.category = category;

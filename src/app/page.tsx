@@ -1,6 +1,8 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useEffect } from 'react';
 import { Shield, Tags, CalendarDays } from 'lucide-react';
 
 const FEATURES = [
@@ -30,6 +32,17 @@ import { NotificationBell } from '@/components/ui/NotificationBell';
 
 export default function Home() {
   const { isAuthenticated, isLoading } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!isLoading && isAuthenticated) {
+      router.push('/dashboard');
+    }
+  }, [isLoading, isAuthenticated, router]);
+
+  if (isAuthenticated) {
+    return null; // Prevent flashing landing page content while redirecting
+  }
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-50 font-sans selection:bg-indigo-500/30">

@@ -17,6 +17,7 @@ export default function CreateEventPage() {
   const [date, setDate] = useState('');
   const [category, setCategory] = useState('');
   const [description, setDescription] = useState('');
+  const [isPrivate, setIsPrivate] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
@@ -32,7 +33,7 @@ export default function CreateEventPage() {
     try {
       await apiClient('/api/events', {
         method: 'POST',
-        body: JSON.stringify({ name, date, category, description }),
+        body: JSON.stringify({ name, date, category, description, isPrivate }),
       });
 
       toast({
@@ -105,6 +106,21 @@ export default function CreateEventPage() {
               onChange={(e) => setDescription(e.target.value)}
               required
             />
+          </div>
+
+          <div className="pt-2">
+            <label className="flex items-center gap-3 p-4 bg-gray-800/30 border border-gray-700/50 rounded-xl cursor-pointer hover:bg-gray-800/50 transition-colors">
+              <input
+                type="checkbox"
+                checked={isPrivate}
+                onChange={(e) => setIsPrivate(e.target.checked)}
+                className="w-5 h-5 rounded border-gray-600 text-blue-500 focus:ring-blue-500 bg-gray-700 cursor-pointer"
+              />
+              <div className="flex flex-col">
+                <span className="text-sm font-semibold text-white">Private Event</span>
+                <span className="text-xs text-gray-400">Only authorized club members can view media</span>
+              </div>
+            </label>
           </div>
 
           <div className="pt-4 flex justify-end">

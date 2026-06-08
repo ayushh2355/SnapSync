@@ -1,16 +1,19 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { X, ChevronLeft, ChevronRight, Heart, MessageCircle, Share2, Download, Loader2, Star, UserPlus, Search } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, Heart, MessageCircle, Share2, Download, Loader2, Star, UserPlus, Search, Trash2, ArrowLeft } from 'lucide-react';
 import { apiClient } from '@/lib/apiClient';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/providers/AuthProvider';
+import { useWatermarkDownload } from '@/hooks/use-watermark-download';
+import { toDisplayUrl } from '@/lib/cloudinaryUrl';
 
 interface Media {
   _id: string;
   fileUrl: string;
   tags: string[];
   detectedUsers?: { _id: string; name: string }[];
+  uploadedBy?: { _id: string; name: string };
 }
 
 interface Comment {
@@ -20,6 +23,8 @@ interface Comment {
   createdAt: string;
 }
 
+type UserRole = 'admin' | 'photographer' | 'member' | 'viewer';
+
 interface LightboxProps {
   isOpen: boolean;
   mediaList: Media[];
@@ -27,6 +32,10 @@ interface LightboxProps {
   onClose: () => void;
   onNext: () => void;
   onPrev: () => void;
+  clubName: string;
+  eventName: string;
+  userRole: UserRole;
+  onDeleteSuccess: (id: string) => void;
 }
 
 export const Lightbox: React.FC<LightboxProps> = ({ 
@@ -35,10 +44,15 @@ export const Lightbox: React.FC<LightboxProps> = ({
   selectedIndex, 
   onClose, 
   onNext, 
-  onPrev 
+  onPrev,
+  clubName,
+  eventName,
+  userRole,
+  onDeleteSuccess,
 }) => {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const { toast } = useToast();
+  const { isDownloading, download } = useWatermarkDownload();
   
   const [likeCount, setLikeCount] = useState(0);
   const [isLiked, setIsLiked] = useState(false);
@@ -46,13 +60,13 @@ export const Lightbox: React.FC<LightboxProps> = ({
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState('');
   const [isPostingComment, setIsPostingComment] = useState(false);
-  const [isDownloading, setIsDownloading] = useState(false);
   const [isLoadingStats, setIsLoadingStats] = useState(false);
   const [isTagging, setIsTagging] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<{_id: string, name: string}[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [localTaggedUsers, setLocalTaggedUsers] = useState<{_id: string, name: string}[]>([]);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const currentMedia = mediaList[selectedIndex];
 
@@ -167,230 +181,313 @@ export const Lightbox: React.FC<LightboxProps> = ({
     }
   };
 
-  const handleTagUser = async (user: {_id: string, name: string}) => {
-    if (localTaggedUsers.find(u => u._id === user._id)) return;
+  const handleTagUser = async (userToTag: {_id: string, name: string}) => {
+    if (localTaggedUsers.find(u => u._id === userToTag._id)) return;
     try {
       const res = await apiClient(`/api/media/${currentMedia._id}/tags`, {
         method: 'POST',
-        body: JSON.stringify({ userId: user._id })
+        body: JSON.stringify({ userId: userToTag._id })
       });
       setLocalTaggedUsers(res.data);
       setSearchQuery('');
       setIsTagging(false);
-      toast({ title: 'User Tagged', description: `${user.name} has been tagged.` });
+      toast({ title: 'User Tagged', description: `${userToTag.name} has been tagged.` });
     } catch (err: unknown) {
       toast({ title: 'Error', description: (err as Error).message, variant: 'destructive' });
     }
   };
 
-  const handleShare = () => {
-    navigator.clipboard.writeText(window.location.href);
-    toast({ title: 'Link Copied', description: 'URL has been copied to your clipboard.' });
-  };
-
   const handleDownload = async () => {
-    setIsDownloading(true);
     try {
-      const token = document.cookie.match(/(^|;\s*)token=([^;]+)/)?.[2];
-      const res = await fetch(`/api/media/${currentMedia._id}/download`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {}
-      });
-      
-      if (!res.ok) throw new Error('Download failed');
-
-      const blob = await res.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `snapsync-${currentMedia._id}.jpg`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      a.remove();
-      
+      await download(
+        currentMedia.fileUrl,
+        clubName,
+        eventName,
+        userRole,
+        `snapsync-${currentMedia._id}.jpg`,
+      );
       toast({ title: 'Downloaded', description: 'Media has been downloaded successfully.' });
     } catch (_) {
       toast({ title: 'Download Error', description: 'Failed to download media.', variant: 'destructive' });
-    } finally {
-      setIsDownloading(false);
     }
   };
 
+  const handleDelete = async () => {
+    if (!window.confirm("Are you sure you want to delete this photo?")) return;
+    setIsDeleting(true);
+    try {
+      await apiClient(`/api/media/${currentMedia._id}`, { method: 'DELETE' });
+      toast({ title: 'Deleted', description: 'Photo has been deleted successfully.' });
+      onClose();
+      onDeleteSuccess(currentMedia._id);
+    } catch (err: unknown) {
+      toast({ title: 'Error', description: (err as Error).message || 'Failed to delete photo', variant: 'destructive' });
+      setIsDeleting(false);
+    }
+  };
+
+  const isUploader = currentMedia.uploadedBy?._id === user?.id;
+  const isAdmin = user?.role === 'Admin';
+  const canDelete = isAdmin || isUploader;
+
+  // Extract a faux filename from the URL or ID
+  const filename = currentMedia.fileUrl.split('/').pop() || `snapsync-${currentMedia._id}.jpg`;
+
   return (
-    <div className="fixed inset-0 z-50 flex bg-black/95 backdrop-blur-sm">
-      <button 
-        onClick={onClose}
-        className="absolute top-4 right-4 md:right-auto md:left-4 z-50 p-2 bg-black/50 hover:bg-black/80 rounded-full text-white transition-colors"
-      >
-        <X size={24} />
-      </button>
-
-      <div className="flex-1 relative flex items-center justify-center">
+    <div className="fixed inset-0 z-50 flex flex-col bg-[#0f172a] overflow-hidden">
+      
+      {/* Top Navigation Bar */}
+      <div className="h-20 border-b border-white/5 flex items-center px-6 shrink-0 bg-slate-900/50 backdrop-blur-md">
         <button 
-          onClick={onPrev}
-          className="absolute left-4 z-50 p-3 bg-black/50 hover:bg-black/80 rounded-full text-white transition-colors"
-          disabled={selectedIndex === 0}
-          style={{ opacity: selectedIndex === 0 ? 0.3 : 1 }}
+          onClick={onClose}
+          className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-slate-300 hover:text-white hover:bg-white/10 transition-all mr-6 group"
         >
-          <ChevronLeft size={32} />
+          <ArrowLeft size={20} className="group-hover:-translate-x-0.5 transition-transform" />
         </button>
-
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img 
-          src={currentMedia.fileUrl} 
-          alt="Expanded media" 
-          className="max-h-screen max-w-full object-contain"
-        />
-
-        <button 
-          onClick={onNext}
-          className="absolute right-4 z-50 p-3 bg-black/50 hover:bg-black/80 rounded-full text-white transition-colors"
-          disabled={selectedIndex === mediaList.length - 1}
-          style={{ opacity: selectedIndex === mediaList.length - 1 ? 0.3 : 1 }}
-        >
-          <ChevronRight size={32} />
-        </button>
+        <div className="flex flex-col">
+          <div className="text-xs font-medium text-slate-400 mb-1">
+            {eventName} <span className="mx-1">&gt;</span> Photo View
+          </div>
+          <h2 className="text-lg font-semibold text-white tracking-wide truncate max-w-lg">
+            {filename}
+          </h2>
+        </div>
       </div>
 
-      <div className="w-full md:w-[400px] h-full bg-gray-900 border-l border-gray-800 flex flex-col flex-shrink-0">
+      <div className="flex flex-1 overflow-hidden">
         
-        <div className="p-4 border-b border-gray-800 flex justify-between items-center bg-gray-900/50">
-          <div className="flex items-center gap-4 text-white">
-            <button onClick={handleLike} className="flex items-center gap-2 hover:text-red-400 transition-colors">
-              <Heart size={24} className={isLiked ? "fill-red-500 text-red-500" : ""} />
-              <span className="font-semibold">{likeCount}</span>
-            </button>
-            <div className="flex items-center gap-2">
-              <MessageCircle size={24} />
-              <span className="font-semibold">{comments.length}</span>
-            </div>
+        {/* Main Image Area */}
+        <div className="flex-1 relative flex items-center justify-center p-8">
+          <button 
+            onClick={onPrev}
+            className="absolute left-8 z-50 p-4 bg-slate-900/80 hover:bg-indigo-600 rounded-full text-white transition-all shadow-xl backdrop-blur-md border border-white/10 hover:border-transparent group"
+            disabled={selectedIndex === 0}
+            style={{ opacity: selectedIndex === 0 ? 0 : 1, pointerEvents: selectedIndex === 0 ? 'none' : 'auto' }}
+          >
+            <ChevronLeft size={24} className="group-hover:-translate-x-0.5 transition-transform" />
+          </button>
+
+          <div className="relative max-w-full max-h-full rounded-2xl overflow-hidden shadow-2xl ring-1 ring-white/10">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img 
+              src={toDisplayUrl(currentMedia.fileUrl)}
+              crossOrigin="anonymous"
+              alt="Expanded media" 
+              className="max-h-full max-w-full object-contain bg-black/40"
+              style={{ maxHeight: 'calc(100vh - 160px)' }}
+            />
           </div>
 
-          <div className="flex gap-3 text-white">
-            <button onClick={handleFavourite} className="p-2 hover:bg-gray-800 rounded-full transition-colors" title="Add to Favourites">
-              <Star size={20} className={isFavourited ? "fill-yellow-500 text-yellow-500" : ""} />
-            </button>
-            <button onClick={handleShare} className="p-2 hover:bg-gray-800 rounded-full transition-colors" title="Copy Link">
-              <Share2 size={20} />
-            </button>
-            <button onClick={handleDownload} disabled={isDownloading} className="p-2 hover:bg-gray-800 rounded-full transition-colors" title="Download">
-              {isDownloading ? <Loader2 size={20} className="animate-spin" /> : <Download size={20} />}
-            </button>
-          </div>
+          <button 
+            onClick={onNext}
+            className="absolute right-8 z-50 p-4 bg-slate-900/80 hover:bg-indigo-600 rounded-full text-white transition-all shadow-xl backdrop-blur-md border border-white/10 hover:border-transparent group"
+            disabled={selectedIndex === mediaList.length - 1}
+            style={{ opacity: selectedIndex === mediaList.length - 1 ? 0 : 1, pointerEvents: selectedIndex === mediaList.length - 1 ? 'none' : 'auto' }}
+          >
+            <ChevronRight size={24} className="group-hover:translate-x-0.5 transition-transform" />
+          </button>
         </div>
 
-        {currentMedia.tags.length > 0 && (
-          <div className="p-4 border-b border-gray-800">
-            <div className="flex flex-wrap gap-2">
-              {currentMedia.tags.map(tag => (
-                <span key={tag} className="text-xs bg-gray-800 text-gray-300 px-3 py-1 rounded-full">
-                  #{tag}
-                </span>
-              ))}
-            </div>
-          </div>
-        )}
-
-        <div className="p-4 border-b border-gray-800">
-          <div className="flex justify-between items-center mb-2">
-            <h4 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">People in this photo</h4>
-            {isAuthenticated && (
+        {/* Right Sidebar */}
+        <div className="w-full md:w-[420px] bg-[#0b1120] border-l border-white/5 flex flex-col flex-shrink-0 overflow-y-auto">
+          <div className="p-6 space-y-6">
+            
+            {/* Top Actions Box */}
+            <div className="flex items-center gap-3 p-4 bg-slate-900/50 rounded-2xl border border-white/5 shadow-inner">
               <button 
-                onClick={() => setIsTagging(!isTagging)}
-                className="text-blue-400 hover:text-blue-300 text-sm flex items-center gap-1"
+                onClick={handleLike} 
+                className={`w-12 h-12 flex flex-col items-center justify-center rounded-xl transition-all ${isLiked ? 'bg-red-500/10 text-red-500' : 'bg-white/5 text-slate-300 hover:bg-white/10'}`}
               >
-                <UserPlus size={14} /> {isTagging ? 'Cancel' : 'Tag'}
+                <Heart size={20} className={isLiked ? "fill-red-500" : ""} />
+                <span className="text-[10px] font-medium mt-1">{likeCount}</span>
               </button>
-            )}
-          </div>
+              <button 
+                onClick={handleFavourite} 
+                className={`w-12 h-12 flex items-center justify-center rounded-xl transition-all ${isFavourited ? 'bg-yellow-500/10 text-yellow-500' : 'bg-white/5 text-slate-300 hover:bg-white/10'}`}
+                title="Add to Favourites"
+              >
+                <Star size={20} className={isFavourited ? "fill-yellow-500" : ""} />
+              </button>
+              <button 
+                onClick={handleDownload} 
+                disabled={isDownloading} 
+                className="flex-1 h-12 flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-medium transition-all shadow-lg shadow-indigo-500/20 active:scale-[0.98] disabled:opacity-70"
+              >
+                {isDownloading ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
+                <span>Download</span>
+              </button>
+              {canDelete && (
+                <button 
+                  onClick={handleDelete} 
+                  disabled={isDeleting} 
+                  className="w-12 h-12 flex items-center justify-center rounded-xl bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-all"
+                  title="Delete Photo"
+                >
+                  {isDeleting ? <Loader2 size={20} className="animate-spin" /> : <Trash2 size={20} />}
+                </button>
+              )}
+            </div>
 
-          <div className="flex flex-wrap gap-2 mb-2">
-            {localTaggedUsers.length === 0 ? (
-              <span className="text-sm text-gray-500">No one tagged yet.</span>
-            ) : (
-              localTaggedUsers.map(user => (
-                <span key={user._id} className="text-sm bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 px-3 py-1 rounded-full flex items-center gap-1">
-                  @ {user.name}
-                </span>
-              ))
-            )}
-          </div>
-
-          {isTagging && (
-            <div className="mt-3 relative">
-              <div className="flex items-center bg-gray-800 border border-gray-700 rounded-lg px-3 py-2">
-                <Search size={16} className="text-gray-400 mr-2" />
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search to tag..."
-                  className="bg-transparent border-none text-sm text-white focus:outline-none w-full"
-                  autoFocus
-                />
+            {/* Properties Panel */}
+            <div className="bg-slate-900/40 rounded-2xl border border-white/5 overflow-hidden">
+              <div className="px-5 py-4 border-b border-white/5">
+                <h3 className="text-xs font-bold tracking-wider text-slate-500 uppercase">Properties</h3>
               </div>
-              {searchQuery.length >= 2 && (
-                <div className="absolute top-full left-0 right-0 mt-1 bg-[#0f172a] border border-gray-800 rounded-lg shadow-xl overflow-hidden z-50">
-                  {isSearching ? (
-                    <div className="p-3 text-sm text-gray-400 flex items-center gap-2">
-                      <Loader2 size={14} className="animate-spin" /> Searching...
-                    </div>
-                  ) : searchResults.length === 0 ? (
-                    <div className="p-3 text-sm text-gray-500">No users found.</div>
+              <div className="p-5 space-y-4">
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-slate-400">Uploaded by</span>
+                  <span className="text-white font-medium">{currentMedia.uploadedBy?.name || 'Unknown'}</span>
+                </div>
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-slate-400">Event Album</span>
+                  <span className="text-indigo-400 font-medium">{eventName}</span>
+                </div>
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-slate-400">Club</span>
+                  <span className="text-white font-medium">{clubName}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* AI Auto Tags */}
+            <div className="bg-slate-900/40 rounded-2xl border border-white/5 overflow-hidden">
+              <div className="px-5 py-4 border-b border-white/5">
+                <h3 className="text-xs font-bold tracking-wider text-slate-500 uppercase">AI Auto Tags</h3>
+              </div>
+              <div className="p-5 flex flex-wrap gap-2">
+                {currentMedia.tags.length === 0 ? (
+                  <span className="text-sm text-slate-500">No tags found.</span>
+                ) : (
+                  currentMedia.tags.map(tag => (
+                    <span key={tag} className="text-xs font-medium bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 px-3 py-1.5 rounded-lg">
+                      #{tag}
+                    </span>
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* Detected Users */}
+            <div className="bg-slate-900/40 rounded-2xl border border-white/5 overflow-hidden">
+              <div className="px-5 py-4 border-b border-white/5 flex justify-between items-center">
+                <h3 className="text-xs font-bold tracking-wider text-slate-500 uppercase">Detected Users</h3>
+                {isAuthenticated && (
+                  <button 
+                    onClick={() => setIsTagging(!isTagging)}
+                    className="text-xs font-medium text-indigo-400 hover:text-indigo-300 flex items-center gap-1"
+                  >
+                    <UserPlus size={12} /> {isTagging ? 'Cancel' : 'Tag'}
+                  </button>
+                )}
+              </div>
+              
+              <div className="p-5">
+                <div className="flex flex-wrap gap-2">
+                  {localTaggedUsers.length === 0 ? (
+                    <span className="text-sm text-slate-500">No users detected/tagged.</span>
                   ) : (
-                    searchResults.map(user => (
-                      <button
-                        key={user._id}
-                        onClick={() => handleTagUser(user)}
-                        className="w-full text-left p-3 hover:bg-gray-800 text-sm text-gray-300 transition-colors border-b border-gray-800/50 last:border-0"
-                      >
-                        {user.name}
-                      </button>
+                    localTaggedUsers.map(u => (
+                      <span key={u._id} className="text-xs font-medium bg-slate-800 text-slate-300 border border-slate-700 px-3 py-1.5 rounded-lg">
+                        @{u.name}
+                      </span>
                     ))
                   )}
                 </div>
-              )}
-            </div>
-          )}
-        </div>
 
-        <div className="flex-1 overflow-y-auto p-4 space-y-6">
-          {isLoadingStats ? (
-            <div className="flex justify-center py-8"><Loader2 className="animate-spin text-gray-500" /></div>
-          ) : comments.length === 0 ? (
-            <div className="text-center text-gray-500 py-8">No comments yet.</div>
-          ) : (
-            comments.map(comment => (
-              <div key={comment._id} className="flex flex-col gap-1">
-                <div className="flex items-baseline gap-2">
-                  <span className="font-semibold text-white text-sm">{comment.userId.name}</span>
-                  <span className="text-xs text-gray-500">
-                    {new Date(comment.createdAt).toLocaleDateString()}
-                  </span>
-                </div>
-                <p className="text-gray-300 text-sm leading-relaxed">{comment.text}</p>
+                {isTagging && (
+                  <div className="mt-4 relative animate-in fade-in slide-in-from-top-2">
+                    <div className="flex items-center bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5">
+                      <Search size={16} className="text-slate-500 mr-2" />
+                      <input
+                        type="text"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        placeholder="Search to tag..."
+                        className="bg-transparent border-none text-sm text-white focus:outline-none w-full"
+                        autoFocus
+                      />
+                    </div>
+                    {searchQuery.length >= 2 && (
+                      <div className="absolute top-full left-0 right-0 mt-2 bg-slate-900 border border-slate-800 rounded-xl shadow-2xl overflow-hidden z-50">
+                        {isSearching ? (
+                          <div className="p-4 text-sm text-slate-400 flex items-center justify-center gap-2">
+                            <Loader2 size={16} className="animate-spin" /> Searching...
+                          </div>
+                        ) : searchResults.length === 0 ? (
+                          <div className="p-4 text-sm text-center text-slate-500">No users found.</div>
+                        ) : (
+                          searchResults.map(u => (
+                            <button
+                              key={u._id}
+                              onClick={() => handleTagUser(u)}
+                              className="w-full text-left px-4 py-3 hover:bg-slate-800 text-sm font-medium text-slate-300 transition-colors border-b border-slate-800/50 last:border-0"
+                            >
+                              {u.name}
+                            </button>
+                          ))
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
-            ))
-          )}
-        </div>
+            </div>
 
-        <div className="p-4 border-t border-gray-800 bg-gray-900">
-          <form onSubmit={handlePostComment} className="flex gap-2">
-            <input
-              type="text"
-              value={newComment}
-              onChange={(e) => setNewComment(e.target.value)}
-              placeholder="Add a comment..."
-              className="flex-1 bg-gray-800 border border-gray-700 rounded-full px-4 py-2 text-sm text-white focus:outline-none focus:border-blue-500"
-            />
-            <button 
-              type="submit" 
-              disabled={!newComment.trim() || isPostingComment}
-              className="text-blue-500 font-semibold px-4 disabled:opacity-50 hover:text-blue-400 transition-colors text-sm"
-            >
-              Post
-            </button>
-          </form>
+            {/* Comments */}
+            <div className="bg-slate-900/40 rounded-2xl border border-white/5 flex flex-col flex-1 min-h-[300px]">
+              <div className="px-5 py-4 border-b border-white/5 flex items-center gap-2">
+                <h3 className="text-xs font-bold tracking-wider text-slate-500 uppercase">Comments</h3>
+                <span className="text-xs font-semibold bg-slate-800 text-slate-300 px-2 py-0.5 rounded-full">{comments.length}</span>
+              </div>
+              
+              <div className="flex-1 overflow-y-auto p-5 space-y-4 max-h-[400px]">
+                {isLoadingStats ? (
+                  <div className="flex justify-center py-8"><Loader2 className="animate-spin text-slate-500" /></div>
+                ) : comments.length === 0 ? (
+                  <div className="text-center text-sm text-slate-500 py-8">
+                    No comments yet. Start the conversation!
+                  </div>
+                ) : (
+                  comments.map(comment => (
+                    <div key={comment._id} className="flex gap-3">
+                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-fuchsia-500 flex items-center justify-center shrink-0">
+                        <span className="text-xs font-bold text-white">{comment.userId.name.charAt(0).toUpperCase()}</span>
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2 mb-0.5">
+                          <span className="font-semibold text-white text-sm">{comment.userId.name}</span>
+                          <span className="text-[10px] text-slate-500 font-medium">
+                            {new Date(comment.createdAt).toLocaleDateString()}
+                          </span>
+                        </div>
+                        <p className="text-slate-300 text-sm leading-relaxed">{comment.text}</p>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              <div className="p-4 border-t border-white/5 bg-slate-900/50 rounded-b-2xl">
+                <form onSubmit={handlePostComment} className="flex items-center gap-2 bg-slate-950 border border-white/5 rounded-xl pr-1 pl-4 py-1">
+                  <input
+                    type="text"
+                    value={newComment}
+                    onChange={(e) => setNewComment(e.target.value)}
+                    placeholder="Add a comment..."
+                    className="flex-1 bg-transparent border-none text-sm text-white py-2 focus:outline-none placeholder:text-slate-600"
+                  />
+                  <button 
+                    type="submit" 
+                    disabled={!newComment.trim() || isPostingComment}
+                    className="text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg transition-all disabled:opacity-50 disabled:hover:bg-indigo-600"
+                  >
+                    Post
+                  </button>
+                </form>
+              </div>
+            </div>
+
+          </div>
         </div>
       </div>
     </div>

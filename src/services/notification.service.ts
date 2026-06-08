@@ -2,14 +2,17 @@ import Notification from '@/models/Notification';
 import '@/models/Media';
 
 interface RealTimeEvent {
-  type: 'like' | 'comment';
-  recipientId: string;
-  actorId: string;
-  mediaId: string;
-  commentId?: string;
+  _id?: string;
+  type: string;
+  recipientId: any;
+  actorId: any;
+  mediaId: any;
+  commentId?: any;
+  createdAt?: string;
+  isRead?: boolean;
 }
 
-type EventCallback = (event: RealTimeEvent) => void;
+type EventCallback = (event: any) => void;
 
 const subscribers: Map<string, Set<EventCallback>> = new Map();
 
@@ -26,14 +29,14 @@ export class NotificationService {
     }
 
     const notification = await Notification.create(data);
+    const populated = await Notification.findById(notification._id)
+      .populate('actorId', 'name email')
+      .populate('mediaId')
+      .lean();
 
-    this.emitToSubscribers({
-      type: data.type,
-      recipientId: data.recipientId,
-      actorId: data.actorId,
-      mediaId: data.mediaId,
-      commentId: data.commentId,
-    });
+    if (populated) {
+      this.emitToSubscribers(populated);
+    }
 
     return notification;
   }
@@ -89,7 +92,8 @@ export class NotificationService {
     };
   }
 
-  private static emitToSubscribers(event: RealTimeEvent) {
-    subscribers.get(event.recipientId)?.forEach((cb) => cb(event));
+  private static emitToSubscribers(event: any) {
+    const recipientId = event.recipientId.toString();
+    subscribers.get(recipientId)?.forEach((cb) => cb(event));
   }
 }

@@ -23,10 +23,12 @@ export default function EventGalleryPage({ params }: { params: Promise<{ id: str
   const { id: eventId } = use(params);
 
   const [mediaList, setMediaList] = useState<Media[]>([]);
+  const [eventName, setEventName] = useState('');
+  const [clubName, setClubName] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
-  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const { isAuthenticated, isLoading: authLoading, user } = useAuth();
 
   useEffect(() => {
     if (!isAuthenticated && !authLoading) {
@@ -36,10 +38,18 @@ export default function EventGalleryPage({ params }: { params: Promise<{ id: str
 
     if (!isAuthenticated) return;
     let isMounted = true;
-    const fetchMedia = async () => {
+    const fetchData = async () => {
       try {
-        const response = await apiClient(`/api/media/search?eventId=${eventId}`);
-        if (isMounted) setMediaList(response.data.media || []);
+        const [mediaResponse, eventResponse] = await Promise.all([
+          apiClient(`/api/media/search?eventId=${eventId}`),
+          apiClient(`/api/events/${eventId}`),
+        ]);
+        if (isMounted) {
+          setMediaList(mediaResponse.data.media || []);
+          const ev = eventResponse.data;
+          setEventName(ev?.name || 'Event');
+          setClubName(ev?.category || 'SnapSync');
+        }
       } catch (err: unknown) {
         if (isMounted) setError((err as Error).message);
       } finally {
@@ -47,7 +57,7 @@ export default function EventGalleryPage({ params }: { params: Promise<{ id: str
       }
     };
 
-    fetchMedia();
+    fetchData();
     return () => { isMounted = false; };
   }, [eventId, isAuthenticated, authLoading, router]);
 
@@ -58,6 +68,10 @@ export default function EventGalleryPage({ params }: { params: Promise<{ id: str
     } catch (err: unknown) {
       console.error(err);
     }
+  };
+
+  const handleDeleteSuccess = (deletedId: string) => {
+    setMediaList(prev => prev.filter(m => m._id !== deletedId));
   };
 
   const totalLikes = mediaList.reduce((sum, m) => sum + (m.likesCount || 0), 0);
@@ -84,13 +98,12 @@ export default function EventGalleryPage({ params }: { params: Promise<{ id: str
       <header className="relative z-20 border-b border-white/5 bg-slate-950/80 backdrop-blur-md sticky top-0">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between gap-4">
           <div className="flex items-center gap-4">
-            <button
-              onClick={() => router.push('/dashboard')}
-              className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors text-sm font-medium group"
-            >
-              <ArrowLeft size={16} className="group-hover:-translate-x-0.5 transition-transform" />
-              Dashboard
-            </button>
+            <div className="flex items-center gap-3 cursor-pointer mr-2" onClick={() => router.push('/dashboard')}>
+              <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-indigo-500 to-fuchsia-500 flex items-center justify-center font-bold text-lg shadow-lg shadow-indigo-500/20 text-white">
+                S
+              </div>
+              <span className="font-semibold text-xl tracking-tight hidden sm:block text-white">SnapSync</span>
+            </div>
             <div className="w-px h-5 bg-white/10" />
             <div className="flex items-center gap-2.5">
               <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-fuchsia-500 flex items-center justify-center shadow-lg shadow-indigo-500/20">
@@ -175,7 +188,13 @@ export default function EventGalleryPage({ params }: { params: Promise<{ id: str
             <p className="text-xs text-slate-600 mt-6">Supports JPG, PNG, WEBP, HEIC · Max 10MB per file</p>
           </div>
         ) : (
-          <ImageGrid mediaList={mediaList} />
+          <ImageGrid
+            mediaList={mediaList}
+            clubName={clubName}
+            eventName={eventName}
+            userRole={(user?.role as 'admin' | 'photographer' | 'member' | 'viewer') ?? 'viewer'}
+            onDeleteSuccess={handleDeleteSuccess}
+          />
         )}
       </main>
 

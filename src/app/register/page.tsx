@@ -48,7 +48,7 @@ export default function RegisterPage() {
       setIsLoading(true);
       const response = await apiClient('/api/auth/google', {
         method: 'POST',
-        body: JSON.stringify({ idToken: credentialResponse.credential }),
+        body: JSON.stringify({ idToken: credentialResponse.credential, role }),
       });
       login(response.data.token, response.data.user);
       toast({ title: 'Welcome', description: 'You have successfully signed in with Google.' });

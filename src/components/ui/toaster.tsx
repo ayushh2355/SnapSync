@@ -2,21 +2,42 @@
 
 import React from 'react';
 import { useToast } from '@/hooks/use-toast';
+import { XCircle, CheckCircle2, X } from 'lucide-react';
 
 export function Toaster() {
-  const { toasts } = useToast();
+  const { toasts, dismiss } = useToast();
 
   return (
-    <div className="fixed bottom-0 right-0 z-[100] flex max-h-screen w-full flex-col-reverse p-4 sm:bottom-0 sm:right-0 sm:top-auto sm:flex-col md:max-w-[420px] gap-2">
+    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[100] flex max-h-screen w-max flex-col-reverse items-center gap-3">
       {toasts.map((t) => (
         <div 
           key={t.id} 
-          className={`pointer-events-auto relative flex w-full items-center justify-between space-x-4 overflow-hidden rounded-md border p-6 pr-8 shadow-lg transition-all ${t.variant === 'destructive' ? 'bg-red-600 border-red-500 text-white' : 'bg-gray-900 border-gray-800 text-white'}`}
+          className="pointer-events-auto flex items-center gap-3 bg-[#0B0E14] border border-white/10 rounded-2xl px-5 py-3.5 shadow-2xl transition-all min-w-[280px] max-w-md animate-in slide-in-from-bottom-5"
         >
-          <div className="grid gap-1">
-            {t.title && <div className="text-sm font-semibold">{t.title}</div>}
-            {t.description && <div className="text-sm opacity-90">{t.description}</div>}
+          {t.variant === 'destructive' ? (
+            <XCircle size={18} className="text-red-500 fill-red-500/10 shrink-0" />
+          ) : (
+            <CheckCircle2 size={18} className="text-green-500 fill-green-500/10 shrink-0" />
+          )}
+          
+          <div className="flex-1 flex flex-col justify-center">
+            {t.title && !t.description && (
+              <span className="text-sm font-medium text-white leading-none">{t.title}</span>
+            )}
+            {t.description && (
+              <span className="text-sm font-medium text-slate-300 leading-tight">
+                {t.title && t.variant !== 'destructive' && <span className="font-semibold text-white mr-2">{t.title}:</span>}
+                {t.description}
+              </span>
+            )}
           </div>
+
+          <button 
+            onClick={() => dismiss(t.id)}
+            className="text-slate-500 hover:text-white transition-colors ml-2 shrink-0"
+          >
+            <X size={16} />
+          </button>
         </div>
       ))}
     </div>

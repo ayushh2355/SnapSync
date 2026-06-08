@@ -150,4 +150,43 @@ export class MediaController {
       return NextResponse.json({ success: false, error: (error as Error).message }, { status: 500 });
     }
   }
+
+  static async deleteMedia(req: NextRequest, mediaId: string) {
+    try {
+      await connectToDatabase();
+      const user = await authenticate(req);
+
+      if (!user) {
+        return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+      }
+
+      const media = await MediaService.getMediaById(mediaId);
+      if (!media) {
+        return NextResponse.json({ success: false, error: 'Media not found' }, { status: 404 });
+      }
+
+      const isUploader = media.uploadedBy.toString() === user.id;
+      const isAdmin = user.role.toLowerCase() === 'admin';
+      
+      // Club Members and Photographers can delete their own uploaded images. Admins can delete any image.
+      if (!isAdmin && !isUploader) {
+        return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
+      }
+
+      if (media.s3Key) {
+        try {
+          await S3Service.deleteFile(media.s3Key);
+        } catch (s3Error) {
+          console.error(`Failed to delete file from S3: ${media.s3Key}`, s3Error);
+          // Continue to delete the record even if S3 delete fails (e.g., file already deleted from S3)
+        }
+      }
+
+      await MediaService.deleteMediaRecord(mediaId);
+
+      return NextResponse.json({ success: true, message: 'Media deleted successfully' }, { status: 200 });
+    } catch (error: unknown) {
+      return NextResponse.json({ success: false, error: (error as Error).message }, { status: 500 });
+    }
+  }
 }

@@ -106,7 +106,7 @@ export const mediaWorker = new Worker(mediaQueueName, async (job) => {
     console.error(`[MediaWorker] Error processing job ${job.id}:`, error);
     throw error;
   }
-}, { connection });
+}, { connection: connection as any });
 
 mediaWorker.on('failed', (job, err) => {
   console.error(`Job ${job?.id} failed with error ${err.message}`);

@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse, after } from 'next/server';
 import { authenticate } from '@/middlewares/auth';
 import connectToDatabase from '@/lib/db';
 import { S3Service } from '@/services/s3.service';
@@ -57,14 +57,12 @@ export class MediaController {
       }
 
       let detectedUsers: string[] = [];
-      let finalTags: string[] = [];
 
       if (fileType === 'image') {
         try {
           detectedUsers = await FaceService.matchFacesAgainstUsers(parsedDescriptors);
-          finalTags = await VisionService.generateTagsFromUrl(fileUrl, mimeType);
         } catch (e) {
-          console.error("Error processing AI tags/faces:", e);
+          console.error("Error processing AI faces:", e);
         }
       }
 
@@ -76,7 +74,7 @@ export class MediaController {
         mimeType,
         fileType,
         accessType: accessType || 'public',
-        tags: finalTags,
+        tags: [],
         detectedUsers,
         hash: s3Key,
       });
@@ -90,6 +88,23 @@ export class MediaController {
             mediaId: mediaRecord._id.toString(),
           });
         }
+      }
+
+      if (fileType === 'image') {
+        after(async () => {
+          try {
+            console.log(`[Async] Starting background Gemini tagging for ${mediaRecord._id}`);
+            const finalTags = await VisionService.generateTagsFromUrl(fileUrl, mimeType);
+            if (finalTags && finalTags.length > 0) {
+              const Media = (await import('@/models/Media')).default;
+              await connectToDatabase();
+              await Media.findByIdAndUpdate(mediaRecord._id, { $set: { tags: finalTags } });
+              console.log(`[Async] Finished tagging ${mediaRecord._id}:`, finalTags);
+            }
+          } catch (e) {
+            console.error(`[Async] Gemini tagging failed for ${mediaRecord._id}:`, e);
+          }
+        });
       }
 
       return NextResponse.json({ success: true, data: mediaRecord }, { status: 201 });

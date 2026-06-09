@@ -95,6 +95,10 @@ export class FaceService {
           await Media.findByIdAndUpdate(media._id, { 
             $addToSet: { detectedUsers: userId } 
           });
+        } else {
+          await Media.findByIdAndUpdate(media._id, { 
+            $pull: { detectedUsers: userId } 
+          });
         }
       }
       console.log(`Retroactive matching completed for user ${userId}`);

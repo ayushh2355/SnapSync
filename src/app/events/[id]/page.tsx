@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { ImageGrid } from '@/components/gallery/ImageGrid';
 import { UploadModal } from '@/components/gallery/UploadModal';
 import { apiClient } from '@/lib/apiClient';
+import { loadModels } from '@/lib/face-api';
 import { Plus, Images, ArrowLeft, Upload, ImageOff, Share2 } from 'lucide-react';
 import { useAuth } from '@/providers/AuthProvider';
 import { NotificationBell } from '@/components/ui/NotificationBell';
@@ -32,6 +33,11 @@ export default function EventGalleryPage({ params }: { params: Promise<{ id: str
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const { isAuthenticated, isLoading: authLoading, user } = useAuth();
+
+  useEffect(() => {
+    // Preload face AI models silently so they're ready when the user opens the upload modal
+    loadModels().catch(console.error);
+  }, []);
 
   useEffect(() => {
     if (!isAuthenticated && !authLoading) {

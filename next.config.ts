@@ -1,8 +1,15 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
   reactCompiler: true,
+
+  // Increase body size limit so Vercel doesn't silently drop large image uploads (default is 1MB)
+  experimental: {
+    serverActions: {
+      bodySizeLimit: '10mb',
+    },
+  },
+
   async headers() {
     return [
       {
@@ -19,3 +26,4 @@ const nextConfig: NextConfig = {
 };
 
 export default nextConfig;
+

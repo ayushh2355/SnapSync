@@ -133,6 +133,70 @@ export class MediaController {
     }
   }
 
+  static async saveMedia(req: NextRequest) {
+    try {
+      await connectToDatabase();
+      const user = await authenticate(req);
+
+      if (!user) {
+        return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+      }
+
+      const body = await req.json();
+      const { eventId, accessType, fileUrl, s3Key, mimeType, fileType, faceDescriptors } = body;
+
+      if (!fileUrl || !eventId) {
+        return NextResponse.json({ success: false, error: 'FileUrl and eventId are required' }, { status: 400 });
+      }
+
+      let parsedDescriptors: number[][] = [];
+      if (faceDescriptors) {
+        parsedDescriptors = safeParseJSON<number[][]>(faceDescriptors, []);
+      }
+
+      let detectedUsers: string[] = [];
+      let finalTags: string[] = [];
+
+      if (fileType === 'image') {
+        try {
+          detectedUsers = await FaceService.matchFacesAgainstUsers(parsedDescriptors);
+          finalTags = await VisionService.generateTagsFromUrl(fileUrl, mimeType);
+        } catch (e) {
+          console.error("Error processing AI tags/faces:", e);
+        }
+      }
+
+      const mediaRecord = await MediaService.createMediaRecord({
+        eventId,
+        uploadedBy: user.id,
+        fileUrl,
+        s3Key,
+        mimeType,
+        fileType,
+        accessType: accessType || 'public',
+        tags: finalTags,
+        detectedUsers,
+        hash: s3Key,
+      });
+
+      for (const taggedUserId of detectedUsers) {
+        if (taggedUserId.toString() !== user.id.toString()) {
+          await NotificationService.createNotification({
+            recipientId: taggedUserId,
+            actorId: user.id,
+            type: 'tag',
+            mediaId: mediaRecord._id.toString(),
+          });
+        }
+      }
+
+      return NextResponse.json({ success: true, data: mediaRecord }, { status: 201 });
+
+    } catch (error: unknown) {
+      return NextResponse.json({ success: false, error: (error as Error).message }, { status: 500 });
+    }
+  }
+
   static async getEventMedia(req: NextRequest, eventId: string) {
     try {
       await connectToDatabase();

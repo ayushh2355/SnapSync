@@ -62,4 +62,17 @@ export class VisionService {
       return FALLBACK_TAGS;
     }
   }
+
+  static async generateTagsFromUrl(url: string, mimeType = 'image/jpeg'): Promise<string[]> {
+    try {
+      const response = await fetch(url);
+      if (!response.ok) throw new Error('Failed to fetch image from URL');
+      const arrayBuffer = await response.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+      return this.generateTags(buffer, mimeType);
+    } catch (error) {
+      console.error('VisionService.generateTagsFromUrl failed:', error);
+      return FALLBACK_TAGS;
+    }
+  }
 }

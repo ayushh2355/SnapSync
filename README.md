@@ -146,19 +146,7 @@ _id, mediaId, userId, createdAt
 
 ---
 
-## Role Permissions
 
-| Action | Viewer | Club Member | Photographer | Admin |
-|--------|--------|-------------|--------------|-------|
-| Browse public events | ✓ | ✓ | ✓ | ✓ |
-| View private photos | ✗ | ✓ | ✓ | ✓ |
-| Upload photos | ✗ | ✓ | ✓ | ✓ |
-| Delete own photos | ✗ | ✓ | ✓ | ✓ |
-| Delete any photo | ✗ | ✗ | ✗ | ✓ |
-| Approve role requests | ✗ | ✗ | ✗ | ✓ |
-| Watermark on download | Heavy | Medium | Light | None |
-
----
 
 ## How Face Recognition Works
 
@@ -221,4 +209,4 @@ Add `REDIS_URL` from Upstash to both Vercel and Render environment variables so 
 
 ## Team
 
-Built by **Ayush Patel** for the CIG Open Projects 2026 hackathon.
+Built by **Ayush Patel** for the CIG Open Projects 2026.

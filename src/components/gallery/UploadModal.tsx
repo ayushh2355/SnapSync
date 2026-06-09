@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/Button';
 import { UploadCloud } from 'lucide-react';
 import { apiClient } from '@/lib/apiClient';
 import { useToast } from '@/hooks/use-toast';
+import { detectAllFaces } from '@/lib/face-api';
 
 interface UploadModalProps {
   isOpen: boolean;
@@ -48,56 +49,128 @@ export const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, event
     
     setIsUploading(true);
 
-    let successCount = 0;
-    let duplicateCount = 0;
-    let failCount = 0;
+    try {
+      const signRes = await apiClient('/api/media/sign-upload');
+      if (!signRes.success) throw new Error('Failed to get upload signature');
+      const { timestamp, signature, cloudName, apiKey, folder } = signRes.data;
 
-    for (const file of Array.from(files)) {
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('eventId', eventId);
-      formData.append('accessType', 'public');
+      const results = await Promise.allSettled(
+        Array.from(files).map(async (file) => {
+          let descriptors: number[][] = [];
+          
+          if (file.type.startsWith('image/')) {
+            const img = new Image();
+            const objectUrl = URL.createObjectURL(file);
+            await new Promise((resolve, reject) => {
+              img.onload = resolve;
+              img.onerror = reject;
+              img.src = objectUrl;
+            });
+            
+            const canvas = document.createElement('canvas');
+            const MAX_DIMENSION = 1000;
+            let width = img.width;
+            let height = img.height;
 
-      try {
-        await apiClient('/api/media/upload', {
-          method: 'POST',
-          body: formData,
-        });
-        successCount++;
-      } catch (err: unknown) {
-        const message = (err as Error).message ?? '';
-        if (message.toLowerCase().includes('duplicate')) {
-          duplicateCount++;
-          toast({
-            title: 'Duplicate Photo',
-            description: `"${file.name}" already exists in this event and was skipped.`,
-            variant: 'destructive',
+            if (width > height && width > MAX_DIMENSION) {
+              height *= MAX_DIMENSION / width;
+              width = MAX_DIMENSION;
+            } else if (height > MAX_DIMENSION) {
+              width *= MAX_DIMENSION / height;
+              height = MAX_DIMENSION;
+            }
+
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            if (ctx) ctx.drawImage(img, 0, 0, width, height);
+            
+            const detections = await detectAllFaces(canvas);
+            descriptors = detections.map(d => Array.from(d.descriptor));
+            URL.revokeObjectURL(objectUrl);
+          }
+
+          const uploadData = new FormData();
+          uploadData.append('file', file);
+          uploadData.append('api_key', apiKey);
+          uploadData.append('timestamp', timestamp.toString());
+          uploadData.append('signature', signature);
+          uploadData.append('folder', folder);
+
+          const uploadRes = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/auto/upload`, {
+            method: 'POST',
+            body: uploadData
           });
+          const uploadResult = await uploadRes.json();
+          if (uploadResult.error) throw new Error(uploadResult.error.message);
+
+          const saveReq = {
+            eventId,
+            accessType: 'public',
+            fileUrl: uploadResult.secure_url,
+            s3Key: uploadResult.public_id,
+            mimeType: file.type,
+            fileType: file.type.startsWith('image/') ? 'image' : 'video',
+            faceDescriptors: JSON.stringify(descriptors)
+          };
+
+          const saveRes = await apiClient('/api/media/save', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(saveReq)
+          });
+          
+          if (!saveRes.success) throw new Error(saveRes.error || 'Failed to save to database');
+          return { file, result: saveRes };
+        })
+      );
+
+      let successCount = 0;
+      let duplicateCount = 0;
+      let failCount = 0;
+
+      for (const outcome of results) {
+        if (outcome.status === 'fulfilled') {
+          successCount++;
         } else {
-          failCount++;
-          toast({
-            title: 'Upload Failed',
-            description: `"${file.name}" could not be uploaded. It may be too large or an unsupported format.`,
-            variant: 'destructive',
-          });
+          const message = (outcome.reason as Error).message ?? '';
+          if (message.toLowerCase().includes('duplicate')) {
+            duplicateCount++;
+            toast({
+              title: 'Duplicate Photo',
+              description: `A photo already exists in this event and was skipped.`,
+              variant: 'destructive',
+            });
+          } else {
+            failCount++;
+            toast({
+              title: 'Upload Failed',
+              description: `A file could not be uploaded. Error: ${message}`,
+              variant: 'destructive',
+            });
+          }
         }
       }
-    }
 
-    setIsUploading(false);
+      setIsUploading(false);
 
-    if (successCount > 0) {
-      toast({
-        title: 'Upload Complete',
-        description: `Successfully uploaded ${successCount} file${successCount !== 1 ? 's' : ''}.`,
-      });
-    }
+      if (successCount > 0) {
+        toast({
+          title: 'Upload Complete',
+          description: `Successfully uploaded ${successCount} file${successCount !== 1 ? 's' : ''}.`,
+        });
+      }
 
-    if (successCount > 0 || duplicateCount > 0 || failCount > 0) {
-      onUploadSuccess();
+      if (successCount > 0 || duplicateCount > 0 || failCount > 0) {
+        onUploadSuccess();
+      }
+      setFiles([]);
+      onClose();
+
+    } catch (err: any) {
+      toast({ title: 'Error', description: err.message, variant: 'destructive' });
+      setIsUploading(false);
     }
-    setFiles([]);
-    onClose();
   };
 
   return (

@@ -9,7 +9,7 @@ export class AuthController {
     try {
       await connectToDatabase();
       const body = await req.json();
-      const { name, email, password, role } = body;
+      const { name, email, password, role, googleId } = body;
 
       if (!name || !email || !password) {
         return NextResponse.json(
@@ -29,7 +29,7 @@ export class AuthController {
         );
       }
 
-      const user = await AuthService.register({ name, email, password, role });
+      const user = await AuthService.register({ name, email, password, role, googleId });
       return NextResponse.json({ success: true, data: user }, { status: 201 });
     } catch (error: unknown) {
       const message = (error as Error).message;
@@ -65,15 +65,21 @@ export class AuthController {
     try {
       await connectToDatabase();
       const body = await req.json();
-      const { idToken, role } = body;
+      const { idToken } = body;
 
       if (!idToken || typeof idToken !== 'string') {
         return NextResponse.json({ success: false, error: 'Google idToken is required' }, { status: 400 });
       }
 
-      const result = await AuthService.googleLogin(idToken, role);
-      return NextResponse.json({ success: true, data: result }, { status: 200 });
+      const result = await AuthService.googleLogin(idToken);
+      
+      if ('isNewUser' in result && result.isNewUser) {
+        return NextResponse.json({ success: true, isNewUser: true, data: result }, { status: 200 });
+      }
+
+      return NextResponse.json({ success: true, isNewUser: false, data: result }, { status: 200 });
     } catch (error: unknown) {
+      console.error('Google login error:', error);
       return NextResponse.json({ success: false, error: GENERIC_AUTH_ERROR }, { status: 401 });
     }
   }

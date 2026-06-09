@@ -74,18 +74,6 @@ export class MediaController {
         return NextResponse.json({ success: false, error: 'Duplicate media detected for this event' }, { status: 409 });
       }
 
-      let finalTags = [...initialTags];
-      let detectedUsers: string[] = [];
-
-      if (fileType === 'image') {
-        const [aiTags, matchedUserIds] = await Promise.all([
-          VisionService.generateTags(buffer),
-          FaceService.detectAndMatchFaces(buffer, file.type),
-        ]);
-        finalTags = Array.from(new Set([...finalTags, ...aiTags]));
-        detectedUsers = matchedUserIds;
-      }
-
       let processedBuffer: Buffer = buffer;
       let processedMime = file.type;
 
@@ -97,6 +85,14 @@ export class MediaController {
           processedBuffer = buffer;
           processedMime = file.type;
         }
+      }
+
+      let finalTags = [...initialTags];
+      let detectedUsers: string[] = [];
+
+      if (fileType === 'image') {
+        // AI processing will be handled by the background worker
+        // to prevent blocking the Node.js event loop
       }
 
       const { url, key } = await S3Service.uploadFile(processedBuffer, processedMime, file.name);
@@ -111,20 +107,18 @@ export class MediaController {
           fileType,
           accessType,
           tags: finalTags,
-          detectedUsers,
+          detectedUsers: [], // Will be populated by the worker
           hash: fileHash,
         });
 
-        // Trigger notifications for auto-tagged users
-        for (const taggedUserId of detectedUsers) {
-          if (taggedUserId !== user.id) {
-            await NotificationService.createNotification({
-              recipientId: taggedUserId,
-              actorId: user.id,
-              type: 'tag',
-              mediaId: mediaRecord._id.toString(),
-            });
-          }
+        if (fileType === 'image') {
+          const { mediaQueue } = await import('@/lib/queue');
+          await mediaQueue.add('PROCESS_MEDIA', {
+            mediaId: mediaRecord._id.toString(),
+            s3Key: key,
+            mimeType: processedMime,
+            uploadedBy: user.id,
+          });
         }
 
         return NextResponse.json({ success: true, data: mediaRecord }, { status: 201 });

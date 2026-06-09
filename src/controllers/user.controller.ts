@@ -35,9 +35,18 @@ export class UserController {
 
       const buffer = Buffer.from(await file.arrayBuffer());
 
-      const faceMetadata = await FaceService.detectFaces(buffer);
-      if (!faceMetadata || (Array.isArray(faceMetadata) && faceMetadata.length === 0)) {
-        return NextResponse.json({ success: false, error: 'No face detected in the uploaded image' }, { status: 422 });
+      const faceDescriptorStr = formData.get('faceDescriptor') as string | null;
+      let faceDescriptor: number[] = [];
+      if (faceDescriptorStr) {
+        try {
+          faceDescriptor = JSON.parse(faceDescriptorStr);
+        } catch (e) {
+          console.error("Failed to parse faceDescriptor:", e);
+        }
+      }
+
+      if (!faceDescriptor || faceDescriptor.length === 0) {
+        return NextResponse.json({ success: false, error: 'No face descriptor provided' }, { status: 422 });
       }
 
       const { url, key } = await S3Service.uploadFile(buffer, file.type, file.name);
@@ -45,9 +54,12 @@ export class UserController {
       try {
         const reference = await UserReference.findOneAndUpdate(
           { userId: user.id },
-          { selfieUrl: url, faceMetadata },
+          { selfieUrl: url, selfieKey: key, faceDescriptor },
           { new: true, upsert: true }
         );
+
+        // Run retroactive matching in the background so it doesn't block the response
+        FaceService.retroactiveMatchForUser(user.id).catch(console.error);
 
         return NextResponse.json({ success: true, data: reference }, { status: 201 });
       } catch (dbError: unknown) {

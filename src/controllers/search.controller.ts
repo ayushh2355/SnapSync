@@ -24,6 +24,7 @@ export class SearchController {
       const tags = searchParams.getAll('tag');
       const eventId = searchParams.get('eventId');
       const uploadedBy = searchParams.get('uploadedBy');
+      const detectedUserId = searchParams.get('detectedUserId');
       const limit = Math.min(safeInt(searchParams.get('limit'), 20), 100);
       const skip = Math.max(safeInt(searchParams.get('skip'), 0), 0);
 
@@ -43,6 +44,10 @@ export class SearchController {
 
       if (uploadedBy && mongoose.Types.ObjectId.isValid(uploadedBy)) {
         query.uploadedBy = new mongoose.Types.ObjectId(uploadedBy);
+      }
+
+      if (detectedUserId && mongoose.Types.ObjectId.isValid(detectedUserId)) {
+        query.detectedUsers = new mongoose.Types.ObjectId(detectedUserId);
       }
 
       const [media, total] = await Promise.all([

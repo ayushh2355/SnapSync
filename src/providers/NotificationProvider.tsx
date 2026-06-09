@@ -1,8 +1,8 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useRef, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState, useCallback, ReactNode } from 'react';
 import { useAuth } from './AuthProvider';
-import { apiClient } from '@/lib/apiClient';
+import { apiClient, getAuthToken } from '@/lib/apiClient';
 
 export interface Notification {
   _id: string;
@@ -18,6 +18,7 @@ interface NotificationContextType {
   unreadCount: number;
   markAsRead: (id: string) => Promise<void>;
   markAllAsRead: () => Promise<void>;
+  refresh: () => Promise<void>;
 }
 
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
@@ -27,43 +28,120 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const eventSourceRef = useRef<EventSource | null>(null);
+  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const sseFailedRef = useRef(false);
 
-  useEffect(() => {
-    if (!isAuthenticated) {
-      setNotifications([]);
-      setUnreadCount(0);
-      return;
+  // ─── Fetch notifications from REST API ────────────────────────────────────
+  const refresh = useCallback(async () => {
+    try {
+      // BUG FIX #1: API returns { success, data: { notifications, total, unreadCount } }
+      // Old code was reading response.notifications which was always undefined
+      const response = await apiClient('/api/notifications?limit=20');
+      setNotifications(response.data?.notifications ?? []);
+      setUnreadCount(response.data?.unreadCount ?? 0);
+    } catch (err) {
+      console.error('Failed to fetch notifications:', err);
     }
+  }, []);
 
-    apiClient('/api/notifications?limit=20')
-      .then((response) => {
-        setNotifications(response.notifications ?? []);
-        setUnreadCount(response.unreadCount ?? 0);
-      })
-      .catch((err) => console.error('Failed to fetch notifications:', err));
+  // ─── Start polling fallback ────────────────────────────────────────────────
+  const startPolling = useCallback(() => {
+    if (pollIntervalRef.current) return; // already polling
+    // Poll every 30s as a reliable fallback when SSE is unavailable
+    pollIntervalRef.current = setInterval(() => {
+      refresh();
+    }, 30_000);
+  }, [refresh]);
 
-    const es = new EventSource('/api/notifications/stream');
+  const stopPolling = useCallback(() => {
+    if (pollIntervalRef.current) {
+      clearInterval(pollIntervalRef.current);
+      pollIntervalRef.current = null;
+    }
+  }, []);
+
+  // ─── Connect SSE stream ────────────────────────────────────────────────────
+  const connectSSE = useCallback(() => {
+    if (eventSourceRef.current) return; // already connected
+
+    // BUG FIX #2: EventSource can't set Authorization headers.
+    // Pass the JWT token as a URL query param so the server can auth the SSE connection.
+    const token = getAuthToken();
+    const url = token
+      ? `/api/notifications/stream?token=${encodeURIComponent(token)}`
+      : '/api/notifications/stream';
+
+    const es = new EventSource(url);
     eventSourceRef.current = es;
 
+    es.onopen = () => {
+      sseFailedRef.current = false;
+      // SSE is working — stop polling since we'll get real-time pushes
+      stopPolling();
+    };
+
     es.onmessage = (event) => {
+      // Ignore heartbeat comments (": heartbeat")
+      if (!event.data || event.data.trim() === '') return;
       try {
         const incoming: Notification = JSON.parse(event.data);
-        setNotifications((prev) => [incoming, ...prev]);
+        setNotifications((prev) => {
+          // Deduplicate — don't add if already in list
+          if (prev.some((n) => n._id === incoming._id)) return prev;
+          return [incoming, ...prev];
+        });
         setUnreadCount((prev) => prev + 1);
       } catch {
-        console.error('Failed to parse SSE payload');
+        // ignore parse errors (heartbeats, etc.)
       }
     };
 
     es.onerror = () => {
-      console.warn('SSE connection lost. Reconnecting...');
-    };
-
-    return () => {
+      console.warn('[SSE] Connection lost — falling back to polling.');
       es.close();
       eventSourceRef.current = null;
+      sseFailedRef.current = true;
+      // BUG FIX #3: When SSE fails, start polling so notifications still arrive
+      startPolling();
+      // Try to reconnect SSE after 10 seconds
+      setTimeout(() => {
+        if (sseFailedRef.current) {
+          connectSSE();
+        }
+      }, 10_000);
     };
-  }, [isAuthenticated]);
+  }, [startPolling, stopPolling]);
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      // Clean up on logout
+      setNotifications([]);
+      setUnreadCount(0);
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close();
+        eventSourceRef.current = null;
+      }
+      stopPolling();
+      return;
+    }
+
+    // Initial fetch immediately
+    refresh();
+
+    // Connect real-time SSE
+    connectSSE();
+
+    // Also start polling as insurance (SSE will stop it once connected)
+    startPolling();
+
+    return () => {
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close();
+        eventSourceRef.current = null;
+      }
+      stopPolling();
+    };
+  }, [isAuthenticated, refresh, connectSSE, startPolling, stopPolling]);
 
   const markAsRead = async (id: string) => {
     try {
@@ -88,7 +166,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <NotificationContext.Provider value={{ notifications, unreadCount, markAsRead, markAllAsRead }}>
+    <NotificationContext.Provider value={{ notifications, unreadCount, markAsRead, markAllAsRead, refresh }}>
       {children}
     </NotificationContext.Provider>
   );

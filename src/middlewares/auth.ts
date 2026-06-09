@@ -21,6 +21,11 @@ function extractToken(req: NextRequest): string | null {
   if (authHeader?.startsWith('Bearer ')) {
     return authHeader.slice(7);
   }
+  // Also check URL query param — needed for EventSource (SSE) which can't set headers
+  const { searchParams } = new URL(req.url);
+  const queryToken = searchParams.get('token');
+  if (queryToken) return queryToken;
+
   return req.cookies.get('token')?.value ?? null;
 }
 

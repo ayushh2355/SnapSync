@@ -19,6 +19,7 @@ export default function RegisterPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState("Viewer");
+  const [googleId, setGoogleId] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
   const { login, isAuthenticated } = useAuth();
@@ -26,6 +27,18 @@ export default function RegisterPage() {
   React.useEffect(() => {
     if (isAuthenticated) {
       router.push("/dashboard");
+    }
+
+    // Auto-fill Google details if passed from login page
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const prefillEmail = params.get("email");
+      const prefillName = params.get("name");
+      const prefillGoogleId = params.get("googleId");
+      
+      if (prefillEmail) setEmail(prefillEmail);
+      if (prefillName) setName(prefillName);
+      if (prefillGoogleId) setGoogleId(prefillGoogleId);
     }
   }, [isAuthenticated, router]);
 
@@ -36,7 +49,7 @@ export default function RegisterPage() {
     try {
       await apiClient("/api/auth/register", {
         method: "POST",
-        body: JSON.stringify({ name, email, password, role }),
+        body: JSON.stringify({ name, email, password, role, googleId: googleId || undefined }),
       });
       toast({
         title: "Registration Successful",
@@ -61,8 +74,20 @@ export default function RegisterPage() {
       setIsLoading(true);
       const response = await apiClient("/api/auth/google", {
         method: "POST",
-        body: JSON.stringify({ idToken: credentialResponse.credential, role }),
+        body: JSON.stringify({ idToken: credentialResponse.credential }),
       });
+
+      if (response.isNewUser) {
+        setEmail(response.data.email);
+        setName(response.data.name);
+        setGoogleId(response.data.googleId);
+        toast({
+          title: "Almost there!",
+          description: "Please set a password and select a role to complete your registration.",
+        });
+        return;
+      }
+
       login(response.data.token, response.data.user);
       toast({
         title: "Welcome",

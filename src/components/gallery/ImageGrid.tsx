@@ -15,6 +15,7 @@ interface Media {
   commentsCount?: number;
   uploadedBy?: { _id: string; name: string };
   detectedUsers?: { _id: string; name: string }[];
+  createdAt?: string;
 }
 
 type UserRole = 'admin' | 'photographer' | 'member' | 'viewer';
@@ -32,10 +33,35 @@ export const ImageGrid: React.FC<ImageGridProps> = ({ mediaList, clubName, event
   const { isDownloading, download } = useWatermarkDownload();
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   
+  // Handle browser back button to close lightbox instead of leaving page
+  React.useEffect(() => {
+    const handlePopState = () => {
+      if (selectedIndex !== null) {
+        setSelectedIndex(null);
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [selectedIndex]);
+
+  const openLightbox = (index: number) => {
+    setSelectedIndex(index);
+    window.history.pushState({ lightboxOpen: true }, '');
+  };
+
+  const closeLightbox = () => {
+    setSelectedIndex(null);
+    if (window.history.state?.lightboxOpen) {
+      window.history.back();
+    }
+  };
+  
   const { user } = useAuth();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedUploader, setSelectedUploader] = useState<string>('all');
+  const [selectedDate, setSelectedDate] = useState('');
+  const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest');
 
   const uniqueUploaders = useMemo(() => {
     const map = new Map<string, string>();
@@ -46,15 +72,31 @@ export const ImageGrid: React.FC<ImageGridProps> = ({ mediaList, clubName, event
   }, [mediaList]);
 
   const filteredMedia = useMemo(() => {
-    return mediaList.filter(media => {
+    let result = mediaList.filter(media => {
       const matchesUploader = selectedUploader === 'all' || media.uploadedBy?._id === selectedUploader;
+      
+      let matchesDate = true;
+      if (selectedDate && media.createdAt) {
+        const mediaDate = new Date(media.createdAt).toISOString().split('T')[0];
+        matchesDate = mediaDate === selectedDate;
+      }
+
       const searchLower = searchTerm.toLowerCase();
       const matchesSearch = !searchTerm || 
         (media.tags?.some(t => t.toLowerCase().includes(searchLower))) ||
         (media.uploadedBy?.name?.toLowerCase().includes(searchLower));
-      return matchesUploader && matchesSearch;
+        
+      return matchesUploader && matchesSearch && matchesDate;
     });
-  }, [mediaList, searchTerm, selectedUploader]);
+
+    result.sort((a, b) => {
+      const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return sortOrder === 'newest' ? dateB - dateA : dateA - dateB;
+    });
+
+    return result;
+  }, [mediaList, searchTerm, selectedUploader, selectedDate, sortOrder]);
 
   const myUploads = useMemo(() => {
     if (!user) return [];
@@ -78,8 +120,8 @@ export const ImageGrid: React.FC<ImageGridProps> = ({ mediaList, clubName, event
       {items.map((media) => (
         <div
           key={media._id}
-          className="relative group overflow-hidden rounded-2xl border border-white/40 bg-white/40 cursor-pointer h-64 shadow-sm"
-          onClick={() => setSelectedIndex(filteredMedia.findIndex(m => m._id === media._id))}
+          className="relative group overflow-hidden rounded-2xl border border-white/40 bg-white/40 cursor-pointer aspect-[4/5] shadow-sm"
+          onClick={() => openLightbox(filteredMedia.findIndex(m => m._id === media._id))}
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
@@ -155,8 +197,8 @@ export const ImageGrid: React.FC<ImageGridProps> = ({ mediaList, clubName, event
 
   return (
     <>
-      <div className="flex flex-col sm:flex-row items-center gap-4 mb-8 bg-white/40 bg-gradient-to-r from-fuchsia-500/5 via-fuchsia-500/5 to-transparent backdrop-blur-md border border-fuchsia-400/30 rounded-[20px] p-4 shadow-[0_15px_40px_rgba(217,70,239,0.1)] hover:shadow-[0_0_60px_rgba(217,70,239,0.3)] hover:border-fuchsia-500/50 transition-all duration-500">
-        <div className="relative flex-1 w-full">
+      <div className="flex flex-col sm:flex-row items-center gap-4 mb-8 bg-white/40 bg-gradient-to-r from-fuchsia-500/5 via-fuchsia-500/5 to-transparent backdrop-blur-md border border-fuchsia-400/30 rounded-[20px] p-4 shadow-[0_15px_40px_rgba(217,70,239,0.1)] hover:shadow-[0_0_60px_rgba(217,70,239,0.3)] hover:border-fuchsia-500/50 transition-all duration-500 flex-wrap">
+        <div className="relative flex-1 min-w-[200px] w-full">
           <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-400" />
           <input 
             type="text" 
@@ -166,6 +208,31 @@ export const ImageGrid: React.FC<ImageGridProps> = ({ mediaList, clubName, event
             className="w-full bg-white/60 dark:bg-slate-950/50 border border-fuchsia-200/50 dark:border-white/10 rounded-xl pl-11 pr-4 py-2.5 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-fuchsia-500 dark:focus:border-white/30 transition-colors placeholder:text-slate-400 dark:placeholder:text-white/40"
           />
         </div>
+
+        <div className="relative w-full sm:w-auto min-w-[150px]">
+          <input 
+            type="date"
+            value={selectedDate}
+            onChange={e => setSelectedDate(e.target.value)}
+            title="Filter by upload date"
+            className="w-full bg-white/60 dark:bg-slate-950/50 border border-fuchsia-200/50 dark:border-white/10 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-fuchsia-500 dark:focus:border-white/30 transition-colors"
+          />
+        </div>
+
+        <div className="relative w-full sm:w-auto min-w-[150px]">
+          <select
+            value={sortOrder}
+            onChange={e => setSortOrder(e.target.value as 'newest' | 'oldest')}
+            className="w-full bg-white/60 dark:bg-slate-950/50 border border-fuchsia-200/50 dark:border-white/10 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-white appearance-none focus:outline-none focus:border-fuchsia-500 dark:focus:border-white/30 transition-colors"
+          >
+            <option value="newest">Sort: Newest First</option>
+            <option value="oldest">Sort: Oldest First</option>
+          </select>
+          <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400 dark:text-slate-400">
+            <Filter size={16} />
+          </div>
+        </div>
+
         <div className="relative w-full sm:w-auto min-w-[200px]">
           <select
             value={selectedUploader}
@@ -183,7 +250,7 @@ export const ImageGrid: React.FC<ImageGridProps> = ({ mediaList, clubName, event
         </div>
       </div>
 
-      <div className="rounded-[28px] border border-fuchsia-400/30 bg-gradient-to-br from-fuchsia-500/10 via-fuchsia-500/5 to-transparent backdrop-blur-md shadow-[0_30px_80px_rgba(217,70,239,0.15)] hover:shadow-[0_0_100px_rgba(217,70,239,0.4)] hover:border-fuchsia-500/60 p-6 sm:p-8 min-h-[400px] transition-all duration-500 bg-white/40">
+      <div className="bg-white/40 backdrop-blur-md border border-white/50 rounded-2xl p-6 sm:p-8 min-h-[400px] transition-all duration-500 hover:shadow-[0_0_80px_rgba(217,70,239,0.3)] hover:border-fuchsia-400/60">
 
       {filteredMedia.length === 0 ? (
         <div className="text-slate-500 text-center py-20 bg-slate-900/40 border border-white/5 rounded-2xl">
@@ -194,7 +261,7 @@ export const ImageGrid: React.FC<ImageGridProps> = ({ mediaList, clubName, event
           {myUploads.length > 0 && (
             <div>
               <div className="flex items-center gap-4 mb-8">
-                <h3 className="text-2xl lg:text-3xl font-semibold text-slate-900 tracking-tight">Your Uploads</h3>
+                <h3 className="text-2xl lg:text-3xl font-semibold text-purple-900 tracking-tight">Your Uploads</h3>
                 <div className="bg-white/30 backdrop-blur-sm rounded-full px-3 py-1 text-sm border border-white/40 shadow-sm text-slate-800 font-medium">
                   {myUploads.length} Photo{myUploads.length !== 1 ? 's' : ''}
                 </div>
@@ -207,7 +274,7 @@ export const ImageGrid: React.FC<ImageGridProps> = ({ mediaList, clubName, event
             <div>
               {myUploads.length > 0 && (
                 <div className="flex items-center gap-4 mb-8">
-                  <h3 className="text-2xl lg:text-3xl font-semibold text-slate-900 tracking-tight">Other Images</h3>
+                  <h3 className="text-2xl lg:text-3xl font-semibold text-purple-900 tracking-tight">Other Images</h3>
                   <div className="bg-white/30 backdrop-blur-sm rounded-full px-3 py-1 text-sm border border-white/40 shadow-sm text-slate-800 font-medium">
                     {otherUploads.length} Photo{otherUploads.length !== 1 ? 's' : ''}
                   </div>
@@ -224,7 +291,7 @@ export const ImageGrid: React.FC<ImageGridProps> = ({ mediaList, clubName, event
         isOpen={selectedIndex !== null}
         mediaList={filteredMedia}
         selectedIndex={selectedIndex || 0}
-        onClose={() => setSelectedIndex(null)}
+        onClose={closeLightbox}
         onNext={() => setSelectedIndex(prev => prev !== null ? Math.min(prev + 1, filteredMedia.length - 1) : null)}
         onPrev={() => setSelectedIndex(prev => prev !== null ? Math.max(prev - 1, 0) : null)}
         clubName={clubName}

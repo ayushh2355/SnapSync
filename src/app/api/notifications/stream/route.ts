@@ -23,7 +23,12 @@ export async function GET(req: NextRequest) {
           controller.enqueue(encoder.encode(data));
         });
 
+        const keepAlive = setInterval(() => {
+          controller.enqueue(encoder.encode(': heartbeat\n\n'));
+        }, 15000);
+
         req.signal.addEventListener('abort', () => {
+          clearInterval(keepAlive);
           unsubscribe();
           controller.close();
         });

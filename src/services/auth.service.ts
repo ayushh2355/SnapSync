@@ -11,9 +11,7 @@ if (!process.env.AUTH_GOOGLE_ID) {
 }
 
 const JWT_SECRET = process.env.JWT_SECRET;
-const GOOGLE_CLIENT_ID = process.env.AUTH_GOOGLE_ID;
-
-const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
+// We read GOOGLE_CLIENT_ID dynamically to avoid process restarts for env changes in dev
 
 function signToken(userId: string, role: string): string {
   return jwt.sign({ id: userId, role }, JWT_SECRET, { expiresIn: '1d' });
@@ -29,8 +27,8 @@ function buildUserPayload(user: { _id: unknown; name: string; email: string; rol
 }
 
 export class AuthService {
-  static async register(data: { name: string; email: string; password: string; role?: string }) {
-    const { name, email, password, role } = data;
+  static async register(data: { name: string; email: string; password: string; role?: string; googleId?: string }) {
+    const { name, email, password, role, googleId } = data;
 
     const existingUser = await User.findOne({ email }).lean();
     if (existingUser) {
@@ -44,6 +42,7 @@ export class AuthService {
       email,
       password: hashedPassword,
       role: role || 'Viewer',
+      googleId,
     });
 
     return buildUserPayload(user);
@@ -66,10 +65,13 @@ export class AuthService {
     return { token, user: buildUserPayload(user) };
   }
 
-  static async googleLogin(idToken: string, role?: string) {
-    const ticket = await googleClient.verifyIdToken({
+  static async googleLogin(idToken: string) {
+    const clientId = process.env.AUTH_GOOGLE_ID;
+    const client = new OAuth2Client(clientId);
+
+    const ticket = await client.verifyIdToken({
       idToken,
-      audience: GOOGLE_CLIENT_ID,
+      audience: clientId,
     });
 
     const payload = ticket.getPayload();
@@ -79,11 +81,18 @@ export class AuthService {
 
     const { email, name, sub: googleId } = payload;
 
-    const user = await User.findOneAndUpdate(
-      { email },
-      { $setOnInsert: { name, email, googleId, role: role || 'Viewer' }, $set: { name, googleId } },
-      { new: true, upsert: true }
-    );
+    const user = await User.findOne({ email });
+
+    if (!user) {
+      // User doesn't exist, return payload for frontend to handle registration
+      return { isNewUser: true, email, name, googleId };
+    }
+
+    // User exists, ensure googleId is set if not already
+    if (!user.googleId) {
+      user.googleId = googleId;
+      await user.save();
+    }
 
     const token = signToken(user._id.toString(), user.role);
     return { token, user: buildUserPayload(user) };

@@ -1,88 +1,54 @@
-import { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
-import { promises as fs } from 'fs';
-import crypto from 'crypto';
-import path from 'path';
+import { v2 as cloudinary } from 'cloudinary';
 
-const USE_S3 = !!(process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY);
-
-const s3Client = USE_S3
-  ? new S3Client({
-      region: process.env.AWS_REGION ?? 'us-east-1',
-      credentials: {
-        accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
-        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
-      },
-    })
-  : null;
-
-if (USE_S3 && !process.env.AWS_S3_BUCKET_NAME) {
-  throw new Error('AWS_S3_BUCKET_NAME is not defined in environment variables');
+function initCloudinary() {
+  if (!cloudinary.config().cloud_name) {
+    cloudinary.config({
+      cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+      api_key: process.env.CLOUDINARY_API_KEY,
+      api_secret: process.env.CLOUDINARY_API_SECRET,
+    });
+  }
 }
 
-const BUCKET_NAME = process.env.AWS_S3_BUCKET_NAME ?? '';
-const LOCAL_STORAGE_DIR = path.join(process.cwd(), 'storage', 'media');
-
 export class S3Service {
-  static async uploadFile(buffer: Buffer, mimeType: string, originalName: string) {
-    const uniqueId = crypto.randomBytes(16).toString('hex');
-    const ext = path.extname(originalName) || '.bin';
-    const key = `media/${Date.now()}-${uniqueId}${ext}`;
-
-    if (USE_S3 && s3Client) {
-      await s3Client.send(
-        new PutObjectCommand({
-          Bucket: BUCKET_NAME,
-          Key: key,
-          Body: buffer,
-          ContentType: mimeType,
-        })
+  static async uploadFile(buffer: Buffer, mimeType: string, originalName: string): Promise<{ url: string; key: string }> {
+    initCloudinary();
+    return new Promise((resolve, reject) => {
+      const uploadStream = cloudinary.uploader.upload_stream(
+        {
+          resource_type: mimeType.startsWith('video/') ? 'video' : 'image',
+          folder: 'snapsync',
+        },
+        (error, result) => {
+          if (error) return reject(error);
+          if (!result) return reject(new Error('Cloudinary upload failed'));
+          resolve({ url: result.secure_url, key: result.public_id });
+        }
       );
-
-      const region = process.env.AWS_REGION ?? 'us-east-1';
-      const url = `https://${BUCKET_NAME}.s3.${region}.amazonaws.com/${key}`;
-      return { url, key };
-    }
-
-    await fs.mkdir(LOCAL_STORAGE_DIR, { recursive: true });
-    const filename = path.basename(key);
-    await fs.writeFile(path.join(LOCAL_STORAGE_DIR, filename), buffer);
-
-    return { url: `/api/media/serve/${filename}`, key };
-  }
-
-  static async deleteFile(key: string): Promise<void> {
-    if (USE_S3 && s3Client) {
-      await s3Client.send(new DeleteObjectCommand({ Bucket: BUCKET_NAME, Key: key }));
-      return;
-    }
-
-    const filePath = path.join(LOCAL_STORAGE_DIR, path.basename(key));
-    await fs.unlink(filePath).catch((err) => {
-      if (err.code !== 'ENOENT') throw err;
+      uploadStream.end(buffer);
     });
   }
 
-  static async getFileBuffer(key: string): Promise<Buffer> {
-    if (USE_S3 && s3Client) {
-      const response = await s3Client.send(
-        new GetObjectCommand({ Bucket: BUCKET_NAME, Key: key })
-      );
-
-      if (!response.Body) {
-        throw new Error('S3 response body is empty');
-      }
-
-      return Buffer.from(await response.Body.transformToByteArray());
-    }
-
-    const filePath = path.join(LOCAL_STORAGE_DIR, path.basename(key));
-
+  static async deleteFile(key: string): Promise<void> {
+    if (!key) return;
+    initCloudinary();
     try {
-      return await fs.readFile(filePath);
+      await cloudinary.uploader.destroy(key);
     } catch (err) {
-      if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
-        throw new Error(`File not found: ${key}`);
-      }
+      console.error(`Cloudinary delete failed for key ${key}:`, err);
+    }
+  }
+
+  static async getFileBuffer(key: string): Promise<Buffer> {
+    initCloudinary();
+    try {
+      const url = cloudinary.url(key, { secure: true });
+      const response = await fetch(url);
+      if (!response.ok) throw new Error(`Failed to fetch from Cloudinary: ${response.statusText}`);
+      const arrayBuffer = await response.arrayBuffer();
+      return Buffer.from(arrayBuffer);
+    } catch (err) {
+      console.error(`Cloudinary getFileBuffer failed for key ${key}:`, err);
       throw err;
     }
   }

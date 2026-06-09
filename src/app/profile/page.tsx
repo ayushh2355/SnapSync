@@ -5,7 +5,9 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/providers/AuthProvider';
 import { Button } from '@/components/ui/Button';
 import { apiClient } from '@/lib/apiClient';
-import { Camera, Activity, Image as ImageIcon, Heart, Users, FolderOpen, ArrowLeft } from 'lucide-react';
+import { Lightbox } from '@/components/gallery/Lightbox';
+import { Camera, Activity, Image as ImageIcon, Heart, Users, FolderOpen, ArrowLeft, ImagePlus } from 'lucide-react';
+import { detectSingleFaceDescriptor } from '@/lib/face-api';
 
 interface Event {
   _id: string;
@@ -26,6 +28,12 @@ export default function ProfilePage() {
   });
   const [referenceUrl, setReferenceUrl] = useState<string | null>(null);
   const [isUploadingSelfie, setIsUploadingSelfie] = useState(false);
+  const [myPhotos, setMyPhotos] = useState<any[]>([]);
+  const [myUploads, setMyUploads] = useState<any[]>([]);
+  const [loadingMyPhotos, setLoadingMyPhotos] = useState(false);
+  const [loadingUploads, setLoadingUploads] = useState(true);
+  const [selectedPhotoIndex, setSelectedPhotoIndex] = useState<number | null>(null);
+  const [lightboxSource, setLightboxSource] = useState<'myPhotos' | 'myUploads'>('myPhotos');
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const { toast } = require('@/hooks/use-toast');
 
@@ -52,6 +60,7 @@ export default function ProfilePage() {
         .then((res) => {
           if (res.success) {
             const media = res.data.media || [];
+            setMyUploads(media);
             // Calculate unique events contributed to
             const uniqueEvents = new Set(media.map((m: any) => m.eventId?._id || m.eventId));
             // Calculate total likes received on own uploads
@@ -64,13 +73,24 @@ export default function ProfilePage() {
             });
           }
         })
-        .catch(console.error);
+        .catch(console.error)
+        .finally(() => setLoadingUploads(false));
 
       // Fetch user's reference photo
       apiClient('/api/users/profile/reference')
         .then((res) => {
           if (res.success && res.data?.selfieUrl) {
             setReferenceUrl(res.data.selfieUrl);
+            
+            setLoadingMyPhotos(true);
+            apiClient(`/api/media/search?detectedUserId=${user.id}&limit=50`)
+              .then((searchRes) => {
+                if (searchRes.success) {
+                  setMyPhotos(searchRes.data.media || []);
+                }
+              })
+              .catch(console.error)
+              .finally(() => setLoadingMyPhotos(false));
           }
         })
         .catch(() => {});
@@ -83,10 +103,55 @@ export default function ProfilePage() {
 
     setIsUploadingSelfie(true);
     try {
-      const formData = new FormData();
-      formData.append('file', file);
+      // 1. Resize and draw to canvas for face-api
+      const img = new Image();
+      const objectUrl = URL.createObjectURL(file);
       
-      const res = await fetch('/api/users/profile/reference', {
+      await new Promise((resolve, reject) => {
+        img.onload = resolve;
+        img.onerror = reject;
+        img.src = objectUrl;
+      });
+
+      const canvas = document.createElement('canvas');
+      const MAX_DIMENSION = 1000;
+      let width = img.width;
+      let height = img.height;
+
+      if (width > height && width > MAX_DIMENSION) {
+        height *= MAX_DIMENSION / width;
+        width = MAX_DIMENSION;
+      } else if (height > MAX_DIMENSION) {
+        width *= MAX_DIMENSION / height;
+        height = MAX_DIMENSION;
+      }
+
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(img, 0, 0, width, height);
+      }
+
+      // 2. Extract facial features
+      toast({ title: 'Processing', description: 'Extracting facial features securely on your device...' });
+      const descriptor = await detectSingleFaceDescriptor(canvas);
+      
+      if (!descriptor) {
+        toast({ title: 'Error', description: 'No face detected in the photo. Please use a clear, front-facing portrait.', variant: 'destructive' });
+        setIsUploadingSelfie(false);
+        URL.revokeObjectURL(objectUrl);
+        return;
+      }
+
+      URL.revokeObjectURL(objectUrl);
+
+      // 3. Send raw image + descriptor vector to backend
+      const formData = new FormData();
+      formData.append('selfie', file);
+      formData.append('faceDescriptor', JSON.stringify(descriptor));
+      
+      const res = await fetch('/api/user/selfie', {
         method: 'POST',
         body: formData,
       });
@@ -95,6 +160,14 @@ export default function ProfilePage() {
       if (data.success) {
         toast({ title: 'Success', description: 'Selfie reference uploaded securely.' });
         setReferenceUrl(data.data.selfieUrl);
+        
+        // Fetch matched photos now
+        setLoadingMyPhotos(true);
+        const searchRes = await apiClient(`/api/media/search?detectedUserId=${user.id}&limit=50`);
+        if (searchRes.success) {
+          setMyPhotos(searchRes.data.media || []);
+        }
+        setLoadingMyPhotos(false);
       } else {
         toast({ title: 'Error', description: data.error || 'Upload failed', variant: 'destructive' });
       }
@@ -257,9 +330,76 @@ export default function ProfilePage() {
               </div>
             </div>
 
+            {/* My Photos Section */}
+            {(referenceUrl || myPhotos.length > 0) && (
+              <div className="dark-card rounded-[2rem] p-8">
+                <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-6 flex items-center gap-2">
+                  <ImagePlus size={20} className="text-fuchsia-500 dark:text-violet-400" />
+                  Photos You Appear In
+                </h3>
+                {loadingMyPhotos ? (
+                  <div className="flex justify-center items-center py-12">
+                    <div className="w-8 h-8 border-4 border-fuchsia-500 border-t-transparent rounded-full animate-spin"></div>
+                  </div>
+                ) : myPhotos.length === 0 ? (
+                  <div className="text-center py-12 border-2 border-dashed border-slate-200 dark:border-[#2d2f45] rounded-2xl bg-slate-50/50 dark:bg-[#0b0e14]/50">
+                    <p className="text-slate-500 text-sm">No matching photos found yet. Upload more photos to events or give AI some time to process.</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                    {myPhotos.map((photo, index) => (
+                      <div 
+                        key={photo._id} 
+                        onClick={() => {
+                          setLightboxSource('myPhotos');
+                          setSelectedPhotoIndex(index);
+                        }}
+                        className="relative group aspect-square rounded-xl overflow-hidden cursor-pointer bg-slate-100 border border-slate-200 dark:border-white/10"
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img 
+                          src={photo.fileUrl} 
+                          alt="You in a photo" 
+                          crossOrigin="anonymous"
+                          className="w-full h-full object-cover transition-transform group-hover:scale-105" 
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-3">
+                          <span className="text-xs text-white font-medium truncate">{photo.eventId?.name || 'Event'}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
           </div>
         </div>
       </div>
+
+
+      {(selectedPhotoIndex !== null && ((lightboxSource === 'myPhotos' && myPhotos[selectedPhotoIndex]) || (lightboxSource === 'myUploads' && myUploads[selectedPhotoIndex]))) && (
+        <Lightbox 
+          isOpen={selectedPhotoIndex !== null}
+          mediaList={lightboxSource === 'myPhotos' ? myPhotos : myUploads}
+          selectedIndex={selectedPhotoIndex || 0}
+          onClose={() => setSelectedPhotoIndex(null)}
+          onNext={() => setSelectedPhotoIndex(prev => prev !== null ? Math.min(prev + 1, (lightboxSource === 'myPhotos' ? myPhotos.length : myUploads.length) - 1) : null)}
+          onPrev={() => setSelectedPhotoIndex(prev => prev !== null ? Math.max(prev - 1, 0) : null)}
+          clubName="SnapSync"
+          eventName={(lightboxSource === 'myPhotos' ? myPhotos[selectedPhotoIndex].eventId?.name : myUploads[selectedPhotoIndex].eventId?.name) || "Personalized Search"}
+          userRole={(user.role as any) ?? 'viewer'}
+          onDeleteSuccess={(id) => {
+            if (lightboxSource === 'myPhotos') {
+              setMyPhotos(prev => prev.filter(m => m._id !== id));
+            } else {
+              setMyUploads(prev => prev.filter(m => m._id !== id));
+              setStats(prev => ({ ...prev, totalUploads: Math.max(0, prev.totalUploads - 1) }));
+            }
+            setSelectedPhotoIndex(null);
+          }}
+        />
+      )}
     </div>
   );
 }

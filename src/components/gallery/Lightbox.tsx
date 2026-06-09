@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { X, ChevronLeft, ChevronRight, Heart, MessageCircle, Share2, Download, Loader2, Star, UserPlus, Search, Trash2, ArrowLeft } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, Heart, MessageCircle, Download, Loader2, Star, UserPlus, Search, Trash2, ArrowLeft } from 'lucide-react';
 import { apiClient } from '@/lib/apiClient';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/providers/AuthProvider';
@@ -14,6 +14,7 @@ interface Media {
   tags: string[];
   detectedUsers?: { _id: string; name: string }[];
   uploadedBy?: { _id: string; name: string };
+  createdAt?: string;
 }
 
 interface Comment {
@@ -339,6 +340,12 @@ export const Lightbox: React.FC<LightboxProps> = ({
                   <span className="text-slate-900 font-semibold">{currentMedia.uploadedBy?.name || 'Unknown'}</span>
                 </div>
                 <div className="flex justify-between items-center text-sm">
+                  <span className="text-slate-500">Upload Date</span>
+                  <span className="text-slate-900 font-semibold">
+                    {currentMedia.createdAt ? new Date(currentMedia.createdAt).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : 'Unknown'}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center text-sm">
                   <span className="text-slate-500">Event Album</span>
                   <span className="text-indigo-600 font-semibold">{eventName}</span>
                 </div>
@@ -371,9 +378,44 @@ export const Lightbox: React.FC<LightboxProps> = ({
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
               <div className="px-5 py-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
                 <h3 className="text-xs font-bold tracking-wider text-slate-500 uppercase">Detected Users</h3>
+                <button 
+                  onClick={() => setIsTagging(!isTagging)}
+                  className="text-indigo-600 hover:bg-indigo-50 p-1.5 rounded-lg transition-colors"
+                  title="Tag User"
+                >
+                  <UserPlus size={16} />
+                </button>
               </div>
               
               <div className="p-5">
+                {isTagging && (
+                  <div className="mb-4 relative">
+                    <div className="flex items-center bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
+                      <Search size={14} className="text-slate-400 mr-2" />
+                      <input 
+                        type="text" 
+                        placeholder="Search users to tag..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="bg-transparent border-none text-sm w-full focus:outline-none"
+                      />
+                    </div>
+                    {isSearching && <div className="text-xs text-slate-500 mt-2 text-center">Searching...</div>}
+                    {searchResults.length > 0 && (
+                      <div className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-40 overflow-y-auto">
+                        {searchResults.map(u => (
+                          <div 
+                            key={u._id}
+                            onClick={() => handleTagUser(u)}
+                            className="px-3 py-2 text-sm hover:bg-indigo-50 cursor-pointer text-slate-700"
+                          >
+                            {u.name}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
                 <div className="flex flex-wrap gap-2">
                   {localTaggedUsers.length === 0 ? (
                     <span className="text-sm text-slate-500">No users detected/tagged.</span>

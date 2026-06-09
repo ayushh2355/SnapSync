@@ -16,6 +16,7 @@ interface Media {
   tags: string[];
   likesCount?: number;
   commentsCount?: number;
+  createdAt?: string;
 }
 
 export default function EventGalleryPage({ params }: { params: Promise<{ id: string }> }) {

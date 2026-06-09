@@ -56,9 +56,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     };
 
     es.onerror = () => {
-      console.error('SSE connection lost');
-      es.close();
-      eventSourceRef.current = null;
+      console.warn('SSE connection lost. Reconnecting...');
     };
 
     return () => {

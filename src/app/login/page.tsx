@@ -62,6 +62,21 @@ export default function LoginPage() {
         method: "POST",
         body: JSON.stringify({ idToken: credentialResponse.credential }),
       });
+
+      if (response.isNewUser) {
+        const params = new URLSearchParams({
+          email: response.data.email,
+          name: response.data.name,
+          googleId: response.data.googleId,
+        });
+        toast({
+          title: "Almost there!",
+          description: "Please set a password and select a role to complete your registration.",
+        });
+        router.push(`/register?${params.toString()}`);
+        return;
+      }
+
       login(response.data.token, response.data.user);
       toast({
         title: "Welcome",

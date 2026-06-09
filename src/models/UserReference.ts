@@ -16,9 +16,9 @@ const UserReferenceSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
-    faceMetadata: {
+    faceDescriptor: {
       type: [Number],
-      required: true,
+      required: false,
       default: [],
     },
   },

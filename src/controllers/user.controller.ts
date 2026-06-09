@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse, after } from 'next/server';
 import { authenticate } from '@/middlewares/auth';
 import connectToDatabase from '@/lib/db';
 import { S3Service } from '@/services/s3.service';
@@ -59,7 +59,9 @@ export class UserController {
         );
 
         // Run retroactive matching in the background so it doesn't block the response
-        FaceService.retroactiveMatchForUser(user.id).catch(console.error);
+        after(() => {
+          FaceService.retroactiveMatchForUser(user.id).catch(console.error);
+        });
 
         return NextResponse.json({ success: true, data: reference }, { status: 201 });
       } catch (dbError: unknown) {

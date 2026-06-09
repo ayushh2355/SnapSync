@@ -10,6 +10,7 @@ interface CreateMediaData {
   accessType?: 'public' | 'private';
   tags?: string[];
   detectedUsers?: string[];
+  faceDescriptors?: number[][];
   hash: string;
 }
 

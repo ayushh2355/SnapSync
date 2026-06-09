@@ -76,6 +76,7 @@ export class MediaController {
         accessType: accessType || 'public',
         tags: [],
         detectedUsers,
+        faceDescriptors: parsedDescriptors,
         hash: s3Key,
       });
 

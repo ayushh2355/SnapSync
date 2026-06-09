@@ -86,7 +86,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, event
             if (ctx) ctx.drawImage(img, 0, 0, width, height);
             
             const detections = await detectAllFaces(canvas);
-            descriptors = detections.map(d => Array.from(d.descriptor));
+            descriptors = detections.map((d: any) => Array.from(d.descriptor));
             URL.revokeObjectURL(objectUrl);
           }
 

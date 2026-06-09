@@ -133,7 +133,7 @@ export default function ProfilePage() {
 
   const handleSelfieUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (!file || !user) return;
 
     setIsUploadingSelfie(true);
     try {

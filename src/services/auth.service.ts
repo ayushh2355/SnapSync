@@ -1,6 +1,8 @@
 import User from '@/models/User';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import RoleRequest from '@/models/RoleRequest';
+
 import { OAuth2Client } from 'google-auth-library';
 
 if (!process.env.JWT_SECRET) {
@@ -11,18 +13,23 @@ if (!process.env.AUTH_GOOGLE_ID) {
 }
 
 const JWT_SECRET = process.env.JWT_SECRET;
-// We read GOOGLE_CLIENT_ID dynamically to avoid process restarts for env changes in dev
 
 function signToken(userId: string, role: string): string {
   return jwt.sign({ id: userId, role }, JWT_SECRET, { expiresIn: '1d' });
 }
 
-function buildUserPayload(user: { _id: unknown; name: string; email: string; role: string }) {
+async function buildUserPayload(user: { _id: unknown; name: string; email: string; role: string }) {
+  const pendingReq = await RoleRequest.findOne({ userId: user._id }).sort({ createdAt: -1 }).lean();
+  
   return {
     id: (user._id as { toString(): string }).toString(),
     name: user.name,
     email: user.email,
     role: user.role,
+    roleRequest: pendingReq ? {
+      requestedRole: pendingReq.requestedRole,
+      status: pendingReq.status
+    } : null
   };
 }
 
@@ -37,15 +44,36 @@ export class AuthService {
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
+    const assignedRole = email.endsWith('@iitr.ac.in') ? 'Club Member' : 'Viewer';
+
+
     const user = await User.create({
       name,
       email,
       password: hashedPassword,
-      role: role || 'Viewer',
+     role: assignedRole,
       googleId,
     });
+  const validRoles = ['Admin', 'Photographer', 'Club Member', 'Viewer'];
+  if (role && validRoles.includes(role) && role !== assignedRole) {
+    const roleReq = await RoleRequest.create({
+      userId: user._id,
+      requestedRole: role,
+      status: 'pending',
+    });
 
-    return buildUserPayload(user);
+    const { NotificationService } = await import('@/services/notification.service');
+    const admins = await User.find({ role: 'Admin' }, '_id').lean();
+    for (const admin of admins) {
+      await NotificationService.createNotification({
+        recipientId: admin._id.toString(),
+        actorId: user._id.toString(),
+        type: 'role_request',
+        requestId: roleReq._id.toString(),
+      });
+    }
+  }
+    return await buildUserPayload(user);
   }
 
   static async login(data: { email: string; password: string }) {
@@ -62,7 +90,7 @@ export class AuthService {
     }
 
     const token = signToken(user._id.toString(), user.role);
-    return { token, user: buildUserPayload(user) };
+    return { token, user: await buildUserPayload(user) };
   }
 
   static async googleLogin(idToken: string) {
@@ -84,17 +112,16 @@ export class AuthService {
     const user = await User.findOne({ email });
 
     if (!user) {
-      // User doesn't exist, return payload for frontend to handle registration
+
       return { isNewUser: true, email, name, googleId };
     }
 
-    // User exists, ensure googleId is set if not already
     if (!user.googleId) {
       user.googleId = googleId;
       await user.save();
     }
 
     const token = signToken(user._id.toString(), user.role);
-    return { token, user: buildUserPayload(user) };
+    return { token, user: await buildUserPayload(user) };
   }
 }

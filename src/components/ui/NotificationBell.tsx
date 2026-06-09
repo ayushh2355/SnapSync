@@ -72,6 +72,12 @@ export const NotificationBell: React.FC = () => {
                         <div className="w-8 h-8 rounded-full bg-pink-500/20 text-pink-500 flex items-center justify-center text-xs font-bold">♥</div>
                       ) : notif.type === 'tag' ? (
                         <div className="w-8 h-8 rounded-full bg-green-500/20 text-green-500 flex items-center justify-center text-xs font-bold">@</div>
+                      ) : notif.type === 'role_request' ? (
+                        <div className="w-8 h-8 rounded-full bg-fuchsia-500/20 text-fuchsia-500 flex items-center justify-center text-xs font-bold">🛡️</div>
+                      ) : notif.type === 'role_approved' ? (
+                        <div className="w-8 h-8 rounded-full bg-emerald-500/20 text-emerald-500 flex items-center justify-center text-xs font-bold">✓</div>
+                      ) : notif.type === 'role_rejected' ? (
+                        <div className="w-8 h-8 rounded-full bg-red-500/20 text-red-500 flex items-center justify-center text-xs font-bold">✕</div>
                       ) : (
                         <div className="w-8 h-8 rounded-full bg-blue-500/20 text-blue-500 flex items-center justify-center text-xs font-bold">💬</div>
                       )}
@@ -79,7 +85,7 @@ export const NotificationBell: React.FC = () => {
                     <div>
                       <p className="text-sm text-slate-700 dark:text-gray-300">
                         <span className="font-semibold text-slate-900 dark:text-white">{notif.actorId?.name || 'Someone'}</span>{' '}
-                        {notif.type === 'like' ? 'liked your photo.' : notif.type === 'tag' ? 'tagged you in a photo!' : 'commented on your photo.'}
+                        {notif.type === 'like' ? 'liked your photo.' : notif.type === 'tag' ? 'tagged you in a photo!' : notif.type === 'role_request' ? 'requested a role upgrade.' : notif.type === 'role_approved' ? 'approved your role upgrade!' : notif.type === 'role_rejected' ? 'rejected your role request.' : 'commented on your photo.'}
                       </p>
                       <span className="text-xs text-slate-500 dark:text-gray-500 mt-1 block">
                         {new Date(notif.createdAt).toLocaleDateString()} at {new Date(notif.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}

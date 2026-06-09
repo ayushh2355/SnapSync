@@ -10,8 +10,9 @@ interface WatermarkParams {
 
 function buildWatermarkParams(clubName: string, eventName: string, role: UserRole): WatermarkParams {
   const isTrusted = role === 'admin' || role === 'photographer';
+  const displayRole = role.charAt(0).toUpperCase() + role.slice(1);
   return {
-    primaryText: `${clubName} \u2022 ${eventName}`,
+    primaryText: `${clubName} \u2022 ${eventName} (${displayRole})`,
     secondaryText: role === 'viewer' ? '\u00a9 SnapSync \u2014 Unauthorized redistribution prohibited' : null,
     isTrusted,
   };

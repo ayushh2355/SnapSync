@@ -223,7 +223,7 @@ export const ImageGrid: React.FC<ImageGridProps> = ({ mediaList, clubName, event
           <select
             value={sortOrder}
             onChange={e => setSortOrder(e.target.value as 'newest' | 'oldest')}
-            className="w-full bg-white/60 dark:bg-slate-950/50 border border-fuchsia-200/50 dark:border-white/10 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-white appearance-none focus:outline-none focus:border-fuchsia-500 dark:focus:border-white/30 transition-colors"
+            className="w-full bg-white/60 dark:bg-slate-950/50 border border-fuchsia-200/50 dark:border-white/10 rounded-xl pl-4 pr-10 py-2.5 text-sm text-slate-900 dark:text-white appearance-none focus:outline-none focus:border-fuchsia-500 dark:focus:border-white/30 transition-colors"
           >
             <option value="newest">Sort: Newest First</option>
             <option value="oldest">Sort: Oldest First</option>

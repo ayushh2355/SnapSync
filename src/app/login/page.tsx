@@ -37,10 +37,19 @@ export default function LoginPage() {
         body: JSON.stringify({ email, password }),
       });
       login(response.data.token, response.data.user);
-      toast({
-        title: "Welcome Back!",
-        description: "You have successfully signed in.",
-      });
+      
+      if (response.data.user.roleRequest?.status === 'pending') {
+        toast({
+          title: "Role Upgrade Pending",
+          description: `Your request for the ${response.data.user.roleRequest.requestedRole} role is currently awaiting Admin approval.`,
+        });
+      } else {
+        toast({
+          title: "Welcome Back!",
+          description: "You have successfully signed in.",
+        });
+      }
+      
       router.push("/dashboard");
     } catch (err: unknown) {
       toast({
@@ -78,10 +87,19 @@ export default function LoginPage() {
       }
 
       login(response.data.token, response.data.user);
-      toast({
-        title: "Welcome",
-        description: "You have successfully signed in with Google.",
-      });
+      
+      if (response.data.user.roleRequest?.status === 'pending') {
+        toast({
+          title: "Role Upgrade Pending",
+          description: `Your request for the ${response.data.user.roleRequest.requestedRole} role is currently awaiting Admin approval.`,
+        });
+      } else {
+        toast({
+          title: "Welcome",
+          description: "You have successfully signed in with Google.",
+        });
+      }
+      
       router.push("/dashboard");
     } catch (err: unknown) {
       toast({

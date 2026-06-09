@@ -34,6 +34,8 @@ export default function ProfilePage() {
   const [loadingUploads, setLoadingUploads] = useState(true);
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState<number | null>(null);
   const [lightboxSource, setLightboxSource] = useState<'myPhotos' | 'myUploads'>('myPhotos');
+  const [roleRequests, setRoleRequests] = useState<any[]>([]);
+  const [loadingRequests, setLoadingRequests] = useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const { toast } = require('@/hooks/use-toast');
 
@@ -54,6 +56,19 @@ export default function ProfilePage() {
         })
         .catch(console.error)
         .finally(() => setLoadingEvents(false));
+
+      // Fetch pending role requests for Admins
+      if (user.role === 'Admin') {
+        setLoadingRequests(true);
+        apiClient('/api/admin/role-requests')
+          .then((res) => {
+            if (res.success) {
+              setRoleRequests(res.data);
+            }
+          })
+          .catch(console.error)
+          .finally(() => setLoadingRequests(false));
+      }
 
       // Fetch user's uploaded media to calculate stats
       apiClient(`/api/media/search?uploadedBy=${user.id}&limit=100`)
@@ -96,6 +111,25 @@ export default function ProfilePage() {
         .catch(() => {});
     }
   }, [isAuthenticated, user]);
+
+  const handleRoleRequest = async (requestId: string, status: 'approved' | 'rejected') => {
+    try {
+      const res = await fetch(`/api/admin/role-requests/${requestId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast({ title: 'Success', description: `Request ${status} successfully` });
+        setRoleRequests((prev) => prev.filter((req) => req._id !== requestId));
+      } else {
+        toast({ title: 'Error', description: data.error || 'Failed to update request', variant: 'destructive' });
+      }
+    } catch (err: any) {
+      toast({ title: 'Error', description: err.message, variant: 'destructive' });
+    }
+  };
 
   const handleSelfieUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -217,8 +251,10 @@ export default function ProfilePage() {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           
-          {/* Left Column: User Card */}
-          <div className="col-span-1 dark-card rounded-[2rem] p-8 flex flex-col items-center text-center relative overflow-hidden h-fit">
+          {/* Left Column */}
+          <div className="col-span-1 flex flex-col gap-6">
+            {/* User Card */}
+            <div className="bg-white/40 dark:bg-[#1a1c2e]/60 backdrop-blur-md border border-white/50 dark:border-[#2d2f45] transition-all duration-500 hover:shadow-[0_0_80px_rgba(217,70,239,0.3)] dark:hover:shadow-[0_0_60px_rgba(139,92,246,0.3)] hover:border-fuchsia-400/60 dark:hover:border-violet-500/50 rounded-[2rem] p-8 flex flex-col items-center text-center relative overflow-hidden h-fit">
             <div className="absolute top-0 right-0 w-64 h-64 bg-fuchsia-500/10 dark:bg-violet-500/5 blur-3xl rounded-full -translate-y-1/2 translate-x-1/3 pointer-events-none"></div>
             
             <div className="w-32 h-32 rounded-full border border-slate-200 dark:border-[#2d2f45] flex items-center justify-center font-bold text-5xl text-fuchsia-600 dark:text-violet-400 bg-slate-50 dark:bg-[#0b0e14] shadow-inner mb-6 relative z-10">
@@ -228,10 +264,16 @@ export default function ProfilePage() {
             <h2 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight mb-1">{user.name}</h2>
             <p className="text-sm text-slate-500 dark:text-[#9ca3af] mb-6">{user.email}</p>
             
-            <div className={`px-4 py-1.5 rounded-full border flex items-center gap-2 text-xs font-bold uppercase tracking-wider mb-8 bg-slate-50 dark:bg-[#0b0e14] ${badgeTheme}`}>
+            <div className={`px-4 py-1.5 rounded-full border flex items-center gap-2 text-xs font-bold uppercase tracking-wider ${user.roleRequest ? 'mb-3' : 'mb-8'} bg-slate-50 dark:bg-[#0b0e14] ${badgeTheme}`}>
               <ShieldIcon role={user.role} />
               {user.role}
             </div>
+
+            {user.roleRequest && user.roleRequest.status === 'pending' && (
+              <div className={`px-3 py-1.5 rounded-lg border text-xs font-medium mb-8 text-center bg-amber-50 dark:bg-amber-500/10 border-amber-200 text-amber-700 dark:text-amber-400`}>
+                Request for {user.roleRequest.requestedRole} is waiting for Admin approval.
+              </div>
+            )}
             
             <button 
               onClick={() => logout()} 
@@ -241,42 +283,8 @@ export default function ProfilePage() {
             </button>
           </div>
 
-          {/* Right Column: Stats & Features */}
-          <div className="col-span-1 lg:col-span-2 flex flex-col gap-6">
-            
-            {/* Stats Grid */}
-            <div className="dark-card rounded-[2rem] p-8">
-              <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-6 flex items-center gap-2">
-                <Activity size={20} className="text-fuchsia-500 dark:text-violet-400" />
-                Activity Overview
-              </h3>
-              
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                <StatCard 
-                  icon={<ImageIcon size={18} className="text-blue-400" />}
-                  label="Total Uploads"
-                  value={stats.totalUploads.toString()}
-                />
-                <StatCard 
-                  icon={<FolderOpen size={18} className="text-emerald-400" />}
-                  label="Albums Contributed"
-                  value={stats.eventsContributedTo.toString()}
-                />
-                <StatCard 
-                  icon={<Heart size={18} className="text-red-400" />}
-                  label="Likes Received"
-                  value={stats.totalLikesReceived.toString()}
-                />
-                <StatCard 
-                  icon={<Users size={18} className="text-fuchsia-400" />}
-                  label="Accessible Albums"
-                  value={loadingEvents ? '...' : events.length.toString()}
-                />
-              </div>
-            </div>
-
             {/* Facial Recognition Hub */}
-            <div className="dark-card rounded-[2rem] p-8">
+            <div className="bg-white/40 dark:bg-[#1a1c2e]/60 backdrop-blur-md border border-white/50 dark:border-[#2d2f45] transition-all duration-500 hover:shadow-[0_0_80px_rgba(217,70,239,0.3)] dark:hover:shadow-[0_0_60px_rgba(139,92,246,0.3)] hover:border-fuchsia-400/60 dark:hover:border-violet-500/50 rounded-[2rem] p-8">
               <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
                 <Camera size={20} className="text-fuchsia-500 dark:text-violet-400" />
                 Facial Recognition Hub
@@ -329,10 +337,83 @@ export default function ProfilePage() {
                 />
               </div>
             </div>
+          </div>
+
+          {/* Right Column: Stats & Features */}
+          <div className="col-span-1 lg:col-span-2 flex flex-col gap-6">
+            
+            {/* Stats Grid */}
+            <div className="bg-white/40 dark:bg-[#1a1c2e]/60 backdrop-blur-md border border-white/50 dark:border-[#2d2f45] transition-all duration-500 hover:shadow-[0_0_80px_rgba(217,70,239,0.3)] dark:hover:shadow-[0_0_60px_rgba(139,92,246,0.3)] hover:border-fuchsia-400/60 dark:hover:border-violet-500/50 rounded-[2rem] p-8">
+              <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-6 flex items-center gap-2">
+                <Activity size={20} className="text-fuchsia-500 dark:text-violet-400" />
+                Activity Overview
+              </h3>
+              
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <StatCard 
+                  icon={<ImageIcon size={18} className="text-blue-400" />}
+                  label="Total Uploads"
+                  value={stats.totalUploads.toString()}
+                />
+                <StatCard 
+                  icon={<FolderOpen size={18} className="text-emerald-400" />}
+                  label="Albums Contributed"
+                  value={stats.eventsContributedTo.toString()}
+                />
+                <StatCard 
+                  icon={<Heart size={18} className="text-red-400" />}
+                  label="Likes Received"
+                  value={stats.totalLikesReceived.toString()}
+                />
+                <StatCard 
+                  icon={<Users size={18} className="text-fuchsia-400" />}
+                  label="Accessible Albums"
+                  value={loadingEvents ? '...' : events.length.toString()}
+                />
+              </div>
+            </div>
+
+            {/* Admin: Pending Role Requests */}
+            {user.role === 'Admin' && roleRequests.length > 0 && (
+              <div className="bg-white/40 dark:bg-[#1a1c2e]/60 backdrop-blur-md border border-red-500/20 dark:border-red-500/20 transition-all duration-500 hover:shadow-[0_0_80px_rgba(239,68,68,0.3)] dark:hover:shadow-[0_0_60px_rgba(239,68,68,0.3)] hover:border-red-400/60 dark:hover:border-red-500/50 rounded-[2rem] p-8">
+                <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-6 flex items-center gap-2">
+                  <ShieldIcon role="Admin" />
+                  Pending Role Requests ({roleRequests.length})
+                </h3>
+                <div className="flex flex-col gap-4">
+                  {roleRequests.map((req) => (
+                    <div key={req._id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 bg-slate-50 dark:bg-[#0b0e14] rounded-xl border border-slate-200 dark:border-white/10 gap-4">
+                      <div>
+                        <p className="font-semibold text-slate-900 dark:text-white">{req.userId?.name || 'Unknown User'}</p>
+                        <p className="text-sm text-slate-500">{req.userId?.email || 'No email'}</p>
+                        <div className="flex items-center gap-2 mt-2">
+                          <span className="text-xs px-2 py-1 bg-slate-200 dark:bg-[#161b22] text-slate-600 dark:text-slate-300 rounded-md">Current: {req.userId?.role}</span>
+                          <span className="text-xs px-2 py-1 bg-fuchsia-500/10 text-fuchsia-600 dark:text-fuchsia-400 rounded-md font-medium">Requested: {req.requestedRole}</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 w-full sm:w-auto">
+                        <button
+                          onClick={() => handleRoleRequest(req._id, 'approved')}
+                          className="flex-1 sm:flex-none px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-medium rounded-lg transition-colors"
+                        >
+                          Approve
+                        </button>
+                        <button
+                          onClick={() => handleRoleRequest(req._id, 'rejected')}
+                          className="flex-1 sm:flex-none px-4 py-2 bg-red-500 hover:bg-red-600 text-white text-sm font-medium rounded-lg transition-colors"
+                        >
+                          Reject
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* My Photos Section */}
             {(referenceUrl || myPhotos.length > 0) && (
-              <div className="dark-card rounded-[2rem] p-8">
+              <div className="bg-white/40 dark:bg-[#1a1c2e]/60 backdrop-blur-md border border-white/50 dark:border-[#2d2f45] transition-all duration-500 hover:shadow-[0_0_80px_rgba(217,70,239,0.3)] dark:hover:shadow-[0_0_60px_rgba(139,92,246,0.3)] hover:border-fuchsia-400/60 dark:hover:border-violet-500/50 rounded-[2rem] p-8">
                 <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-6 flex items-center gap-2">
                   <ImagePlus size={20} className="text-fuchsia-500 dark:text-violet-400" />
                   Photos You Appear In

@@ -7,6 +7,8 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/providers/AuthProvider';
 import { useWatermarkDownload } from '@/hooks/use-watermark-download';
 import { toDisplayUrl } from '@/lib/cloudinaryUrl';
+import { Modal } from '@/components/ui/Modal';
+import { Button } from '@/components/ui/Button';
 
 interface Media {
   _id: string;
@@ -68,6 +70,7 @@ export const Lightbox: React.FC<LightboxProps> = ({
   const [isSearching, setIsSearching] = useState(false);
   const [localTaggedUsers, setLocalTaggedUsers] = useState<{_id: string, name: string}[]>([]);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const currentMedia = mediaList[selectedIndex];
 
@@ -213,8 +216,12 @@ export const Lightbox: React.FC<LightboxProps> = ({
     }
   };
 
-  const handleDelete = async () => {
-    if (!window.confirm("Are you sure you want to delete this photo?")) return;
+  const handleDelete = () => {
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmDelete = async () => {
+    setShowDeleteConfirm(false);
     setIsDeleting(true);
     try {
       await apiClient(`/api/media/${currentMedia._id}`, { method: 'DELETE' });
@@ -223,6 +230,7 @@ export const Lightbox: React.FC<LightboxProps> = ({
       onDeleteSuccess(currentMedia._id);
     } catch (err: unknown) {
       toast({ title: 'Error', description: (err as Error).message || 'Failed to delete photo', variant: 'destructive' });
+    } finally {
       setIsDeleting(false);
     }
   };
@@ -487,6 +495,22 @@ export const Lightbox: React.FC<LightboxProps> = ({
           </div>
         </div>
       </div>
+
+      <Modal 
+        isOpen={showDeleteConfirm} 
+        onClose={() => setShowDeleteConfirm(false)}
+        title="Delete Photo"
+      >
+        <p className="text-slate-600 dark:text-slate-300 mb-6 font-medium text-sm">Are you sure you want to permanently delete this photo? This action cannot be undone.</p>
+        <div className="flex gap-3 justify-end">
+          <Button variant="secondary" onClick={() => setShowDeleteConfirm(false)}>
+            Cancel
+          </Button>
+          <Button variant="danger" onClick={confirmDelete}>
+            Delete
+          </Button>
+        </div>
+      </Modal>
     </div>
   );
 };

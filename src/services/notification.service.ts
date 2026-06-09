@@ -20,9 +20,10 @@ export class NotificationService {
   static async createNotification(data: {
     recipientId: string;
     actorId: string;
-    type: 'like' | 'comment' | 'tag';
-    mediaId: string;
+    type: 'like' | 'comment' | 'tag' | 'role_request' | 'role_approved' | 'role_rejected';
+    mediaId?: string;
     commentId?: string;
+    requestId?: string;
   }) {
     if (data.recipientId === data.actorId) {
       return null;

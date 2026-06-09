@@ -5,10 +5,11 @@ import { useRouter } from 'next/navigation';
 import { ImageGrid } from '@/components/gallery/ImageGrid';
 import { UploadModal } from '@/components/gallery/UploadModal';
 import { apiClient } from '@/lib/apiClient';
-import { Plus, Images, ArrowLeft, Upload, ImageOff } from 'lucide-react';
+import { Plus, Images, ArrowLeft, Upload, ImageOff, Share2 } from 'lucide-react';
 import { useAuth } from '@/providers/AuthProvider';
 import { NotificationBell } from '@/components/ui/NotificationBell';
 import { ProfileDropdown } from '@/components/ui/ProfileDropdown';
+import { Modal } from '@/components/ui/Modal';
 
 interface Media {
   _id: string;
@@ -29,6 +30,7 @@ export default function EventGalleryPage({ params }: { params: Promise<{ id: str
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const { isAuthenticated, isLoading: authLoading, user } = useAuth();
 
   useEffect(() => {
@@ -118,6 +120,14 @@ export default function EventGalleryPage({ params }: { params: Promise<{ id: str
             )}
 
             <button
+              onClick={() => setIsShareModalOpen(true)}
+              className="flex items-center gap-2 bg-white/40 dark:bg-white/10 hover:bg-white/60 dark:hover:bg-white/20 text-slate-700 dark:text-slate-200 text-sm font-medium px-4 py-2 rounded-full backdrop-blur-md border border-white/50 dark:border-white/10 transition-all shadow-sm active:scale-95"
+            >
+              <Share2 size={15} />
+              <span className="hidden sm:inline">Share</span>
+            </button>
+
+            <button
               onClick={() => setIsUploadModalOpen(true)}
               className="flex items-center gap-2 bg-gradient-to-r from-fuchsia-600 to-blue-600 dark:bg-indigo-600 hover:from-fuchsia-500 hover:to-blue-500 dark:hover:bg-indigo-500 text-white text-sm font-medium px-4 py-2 rounded-full transition-all shadow-lg shadow-fuchsia-500/20 dark:shadow-indigo-500/20 hover:shadow-fuchsia-500/40 dark:hover:shadow-indigo-500/40 active:scale-95"
             >
@@ -133,6 +143,24 @@ export default function EventGalleryPage({ params }: { params: Promise<{ id: str
 
       {/* Main content */}
       <main className="relative z-10 max-w-7xl mx-auto px-4 sm:px-8 mt-8 pb-24">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6 mb-10">
+          <button 
+            onClick={() => router.push('/dashboard')} 
+            className="w-10 h-10 rounded-full bg-white/40 dark:bg-[#1a1c2e]/60 backdrop-blur-md border border-white/50 dark:border-white/10 flex items-center justify-center text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-white/60 dark:hover:bg-white/10 transition-all shadow-sm"
+          >
+            <ArrowLeft size={18} />
+          </button>
+          <div>
+            <h1 className="text-3xl sm:text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-fuchsia-600 to-indigo-600 dark:from-fuchsia-400 dark:to-indigo-400 tracking-tight mb-2">
+              {eventName}
+            </h1>
+            <div className="flex items-center gap-3">
+              <span className="px-3 py-1 bg-white/40 dark:bg-white/5 backdrop-blur-md border border-white/50 dark:border-white/10 rounded-full text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400">
+                {clubName}
+              </span>
+            </div>
+          </div>
+        </div>
         {error ? (
           <div className="flex flex-col items-center justify-center min-h-[60vh] text-center">
             <div className="w-16 h-16 rounded-2xl bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 flex items-center justify-center mb-4">
@@ -203,6 +231,31 @@ export default function EventGalleryPage({ params }: { params: Promise<{ id: str
         eventId={eventId}
         onUploadSuccess={handleUploadSuccess}
       />
+
+      <Modal isOpen={isShareModalOpen} onClose={() => setIsShareModalOpen(false)} title="Share Album">
+        <div className="flex flex-col items-center text-center p-4">
+          <p className="text-slate-500 dark:text-slate-400 text-sm mb-6">
+            Scan this QR code to quickly access the <strong>{eventName}</strong> album on any device.
+          </p>
+          <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 mb-6">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img 
+              src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(typeof window !== 'undefined' ? window.location.href : '')}`} 
+              alt="QR Code" 
+              className="w-48 h-48"
+            />
+          </div>
+          <button
+            onClick={() => {
+              navigator.clipboard.writeText(typeof window !== 'undefined' ? window.location.href : '');
+              alert('Link copied to clipboard!');
+            }}
+            className="text-fuchsia-600 dark:text-fuchsia-400 font-medium text-sm hover:underline"
+          >
+            Copy Album Link
+          </button>
+        </div>
+      </Modal>
     </div>
   );
 }

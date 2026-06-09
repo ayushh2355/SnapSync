@@ -50,7 +50,7 @@ export class DownloadController {
       }
 
       const mimeType = media.mimeType as string | undefined;
-      const meta = (mimeType && FILE_TYPE_META[mimeType]) ?? (isImage
+      const meta = (mimeType ? FILE_TYPE_META[mimeType] : undefined) ?? (isImage
         ? FILE_TYPE_META['image/jpeg']
         : FILE_TYPE_META['video/mp4']);
 

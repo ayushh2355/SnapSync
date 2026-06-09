@@ -9,9 +9,9 @@ const connection = new IORedis(process.env.REDIS_URL || 'redis://127.0.0.1:6379'
 export const mediaQueueName = 'media-processing-queue';
 
 export const mediaQueue = new Queue(mediaQueueName, {
-  connection,
+  connection: connection as any,
 });
 
 export const mediaQueueEvents = new QueueEvents(mediaQueueName, {
-  connection,
+  connection: connection as any,
 });

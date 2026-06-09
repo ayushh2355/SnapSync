@@ -29,6 +29,15 @@ export function toast({ title, description, variant = 'default' }: Omit<Toast, '
   }, 5000);
 }
 
+export function dismiss(id?: string) {
+  if (id) {
+    memoryState = memoryState.filter((t) => t.id !== id);
+  } else {
+    memoryState = [];
+  }
+  dispatch();
+}
+
 export function useToast() {
   const [toasts, setToasts] = useState<Toast[]>(memoryState);
 
@@ -39,5 +48,5 @@ export function useToast() {
     };
   }, []);
 
-  return { toasts, toast };
+  return { toasts, toast, dismiss };
 }
